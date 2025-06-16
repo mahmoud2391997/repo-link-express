@@ -1,10 +1,9 @@
-
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { GamepadIcon, CoffeeIcon, BarChart3Icon, PlayIcon, CalendarIcon, ShoppingCartIcon, CreditCardIcon } from 'lucide-react';
+import { GamepadIcon, CoffeeIcon, BarChart3Icon, PlayIcon, CalendarIcon, ShoppingCartIcon, CreditCardIcon, SettingsIcon } from 'lucide-react';
 import RoomCard from '@/components/RoomCard';
 import BookingModal from '@/components/BookingModal';
 import AppointmentModal from '@/components/AppointmentModal';
@@ -12,11 +11,14 @@ import CafeSection from '@/components/CafeSection';
 import Reports from '@/components/Reports';
 import CurrentOrders from '@/components/CurrentOrders';
 import TransactionsTab from '@/components/TransactionsTab';
+import AdminDashboard from '@/components/AdminDashboard';
+import { getRooms, Room as DatabaseRoom } from '@/services/supabaseService';
 import { Room, roomsData } from '@/data/roomsData';
 import { requestNotificationPermission } from '@/utils/notificationUtils';
 
 const Index = () => {
   const [rooms, setRooms] = useState<Room[]>(roomsData);
+  const [databaseRooms, setDatabaseRooms] = useState<DatabaseRoom[]>([]);
   const [selectedRoom, setSelectedRoom] = useState<Room | null>(null);
   const [isBookingModalOpen, setIsBookingModalOpen] = useState(false);
   const [isAppointmentModalOpen, setIsAppointmentModalOpen] = useState(false);
@@ -24,11 +26,42 @@ const Index = () => {
   // Request notification permission on component mount
   useEffect(() => {
     requestNotificationPermission();
+    loadDatabaseRooms();
   }, []);
 
-  const activeRooms = rooms.filter(room => room.status === 'occupied').length;
-  const availableRooms = rooms.filter(room => room.status === 'available').length;
-  const totalRevenue = rooms.reduce((sum, room) => sum + (room.currentSession?.totalCost || 0), 0);
+  const loadDatabaseRooms = async () => {
+    try {
+      const dbRooms = await getRooms();
+      setDatabaseRooms(dbRooms);
+      
+      // Sync local rooms with database rooms
+      const syncedRooms = rooms.map(localRoom => {
+        const dbRoom = dbRooms.find(db => db.id === localRoom.id);
+        if (dbRoom) {
+          return {
+            ...localRoom,
+            status: dbRoom.status as 'available' | 'occupied' | 'cleaning',
+            currentSession: dbRoom.current_customer_name ? {
+              customerName: dbRoom.current_customer_name,
+              startTime: new Date(dbRoom.current_session_start!),
+              endTime: new Date(dbRoom.current_session_end!),
+              hours: 0, // Will be calculated
+              totalCost: dbRoom.current_total_cost || 0,
+              products: []
+            } : null
+          };
+        }
+        return localRoom;
+      });
+      setRooms(syncedRooms);
+    } catch (error) {
+      console.error('Error loading database rooms:', error);
+    }
+  };
+
+  const activeRooms = databaseRooms.filter(room => room.status === 'occupied').length;
+  const availableRooms = databaseRooms.filter(room => room.status === 'available').length;
+  const totalRevenue = databaseRooms.reduce((sum, room) => sum + (room.current_total_cost || 0), 0);
 
   const handleStartSession = (roomId: string) => {
     const room = rooms.find(r => r.id === roomId);
@@ -52,6 +85,8 @@ const Index = () => {
         ? { ...room, status: 'available', currentSession: null }
         : room
     ));
+    // Reload database rooms to sync
+    loadDatabaseRooms();
   };
 
   const handleBookRoom = (roomId: string, customerName: string, hours: number, mode: 'single' | 'multiplayer') => {
@@ -80,6 +115,8 @@ const Index = () => {
     ));
     setIsBookingModalOpen(false);
     setSelectedRoom(null);
+    // Reload database rooms to sync
+    setTimeout(() => loadDatabaseRooms(), 1000);
   };
 
   const handleAppointmentCreated = () => {
@@ -117,7 +154,7 @@ const Index = () => {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">{activeRooms}</div>
-              <p className="text-xs text-blue-100">out of {rooms.length} rooms</p>
+              <p className="text-xs text-blue-100">out of {databaseRooms.length} rooms</p>
             </CardContent>
           </Card>
 
@@ -127,19 +164,19 @@ const Index = () => {
               <BarChart3Icon className="h-4 w-4" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{totalRevenue} EGP</div>
-              <p className="text-xs text-green-100">+12% from yesterday</p>
+              <div className="text-2xl font-bold">{totalRevenue.toFixed(2)} EGP</div>
+              <p className="text-xs text-green-100">Current active sessions</p>
             </CardContent>
           </Card>
 
           <Card className="bg-gradient-to-r from-purple-600 to-purple-700 border-0 text-white">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Avg Session</CardTitle>
+              <CardTitle className="text-sm font-medium">Total Rooms</CardTitle>
               <PlayIcon className="h-4 w-4" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">2.5h</div>
-              <p className="text-xs text-purple-100">average duration</p>
+              <div className="text-2xl font-bold">{databaseRooms.length}</div>
+              <p className="text-xs text-purple-100">gaming stations</p>
             </CardContent>
           </Card>
 
@@ -157,7 +194,7 @@ const Index = () => {
 
         {/* Main Content */}
         <Tabs defaultValue="rooms" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-6 bg-slate-800 border-0">
+          <TabsList className="grid w-full grid-cols-7 bg-slate-800 border-0">
             <TabsTrigger value="rooms" className="data-[state=active]:bg-blue-600 text-white">
               <GamepadIcon className="w-4 h-4 mr-2" />
               Rooms
@@ -181,6 +218,10 @@ const Index = () => {
             <TabsTrigger value="reports" className="data-[state=active]:bg-blue-600 text-white">
               <BarChart3Icon className="w-4 h-4 mr-2" />
               Reports
+            </TabsTrigger>
+            <TabsTrigger value="admin" className="data-[state=active]:bg-blue-600 text-white">
+              <SettingsIcon className="w-4 h-4 mr-2" />
+              Admin
             </TabsTrigger>
           </TabsList>
 
@@ -233,6 +274,10 @@ const Index = () => {
 
           <TabsContent value="reports">
             <Reports />
+          </TabsContent>
+
+          <TabsContent value="admin">
+            <AdminDashboard />
           </TabsContent>
         </Tabs>
 

@@ -43,7 +43,15 @@ export type Database = {
           status?: string
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "fk_appointments_room_id"
+            columns: ["room_id"]
+            isOneToOne: false
+            referencedRelation: "rooms"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       cafe_products: {
         Row: {
@@ -154,6 +162,62 @@ export type Database = {
           start_time?: string | null
           status?: string
           total_amount?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fk_orders_room_id"
+            columns: ["room_id"]
+            isOneToOne: false
+            referencedRelation: "rooms"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      rooms: {
+        Row: {
+          console_type: string
+          created_at: string
+          current_customer_name: string | null
+          current_mode: string | null
+          current_session_end: string | null
+          current_session_start: string | null
+          current_total_cost: number | null
+          id: string
+          name: string
+          pricing_multiplayer: number
+          pricing_single: number
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          console_type: string
+          created_at?: string
+          current_customer_name?: string | null
+          current_mode?: string | null
+          current_session_end?: string | null
+          current_session_start?: string | null
+          current_total_cost?: number | null
+          id: string
+          name: string
+          pricing_multiplayer: number
+          pricing_single: number
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          console_type?: string
+          created_at?: string
+          current_customer_name?: string | null
+          current_mode?: string | null
+          current_session_end?: string | null
+          current_session_start?: string | null
+          current_total_cost?: number | null
+          id?: string
+          name?: string
+          pricing_multiplayer?: number
+          pricing_single?: number
+          status?: string
           updated_at?: string
         }
         Relationships: []
