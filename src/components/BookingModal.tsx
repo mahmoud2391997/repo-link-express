@@ -6,19 +6,21 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { GamepadIcon, ClockIcon, DollarSignIcon } from 'lucide-react';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { GamepadIcon, ClockIcon, DollarSignIcon, UserIcon, UsersIcon } from 'lucide-react';
 import { Room } from '@/data/roomsData';
 
 interface BookingModalProps {
   isOpen: boolean;
   onClose: () => void;
   room: Room | null;
-  onBook: (roomId: string, customerName: string, hours: number) => void;
+  onBook: (roomId: string, customerName: string, hours: number, mode: 'single' | 'multiplayer') => void;
 }
 
 const BookingModal = ({ isOpen, onClose, room, onBook }: BookingModalProps) => {
   const [customerName, setCustomerName] = useState('');
   const [hours, setHours] = useState(1);
+  const [selectedMode, setSelectedMode] = useState<'single' | 'multiplayer'>('single');
 
   if (!room) return null;
 
@@ -37,15 +39,16 @@ const BookingModal = ({ isOpen, onClose, room, onBook }: BookingModalProps) => {
   ];
 
   const calculateCost = () => {
-    return hours * room.pricing[room.mode];
+    return hours * room.pricing[selectedMode];
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (customerName.trim()) {
-      onBook(room.id, customerName.trim(), hours);
+      onBook(room.id, customerName.trim(), hours, selectedMode);
       setCustomerName('');
       setHours(1);
+      setSelectedMode('single');
     }
   };
 
@@ -64,9 +67,6 @@ const BookingModal = ({ isOpen, onClose, room, onBook }: BookingModalProps) => {
             <Badge className={room.console === 'PS5' ? 'bg-blue-600' : 'bg-purple-600'}>
               {room.console}
             </Badge>
-            <Badge variant="outline" className="text-white border-slate-500">
-              {room.mode === 'single' ? 'Single Player' : 'Multiplayer'}
-            </Badge>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">
@@ -80,6 +80,32 @@ const BookingModal = ({ isOpen, onClose, room, onBook }: BookingModalProps) => {
                 className="bg-slate-700 border-slate-600 text-white"
                 required
               />
+            </div>
+
+            <div>
+              <Label className="text-white mb-3 block">Game Mode</Label>
+              <RadioGroup 
+                value={selectedMode} 
+                onValueChange={(value: 'single' | 'multiplayer') => setSelectedMode(value)}
+                className="flex gap-4"
+              >
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="single" id="single" className="border-white" />
+                  <Label htmlFor="single" className="text-white flex items-center gap-2 cursor-pointer">
+                    <UserIcon className="w-4 h-4" />
+                    Single Player
+                    <span className="text-green-400">({room.pricing.single} EGP/hr)</span>
+                  </Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="multiplayer" id="multiplayer" className="border-white" />
+                  <Label htmlFor="multiplayer" className="text-white flex items-center gap-2 cursor-pointer">
+                    <UsersIcon className="w-4 h-4" />
+                    Multiplayer
+                    <span className="text-green-400">({room.pricing.multiplayer} EGP/hr)</span>
+                  </Label>
+                </div>
+              </RadioGroup>
             </div>
 
             <div>
@@ -111,8 +137,15 @@ const BookingModal = ({ isOpen, onClose, room, onBook }: BookingModalProps) => {
                 <span>{hours} hour(s)</span>
               </div>
               <div className="flex items-center justify-between">
+                <span>Mode:</span>
+                <span className="flex items-center gap-1">
+                  {selectedMode === 'single' ? <UserIcon className="w-4 h-4" /> : <UsersIcon className="w-4 h-4" />}
+                  {selectedMode === 'single' ? 'Single Player' : 'Multiplayer'}
+                </span>
+              </div>
+              <div className="flex items-center justify-between">
                 <span>Rate:</span>
-                <span>{room.pricing[room.mode]} EGP/hr</span>
+                <span>{room.pricing[selectedMode]} EGP/hr</span>
               </div>
               <div className="flex items-center justify-between text-lg font-bold text-green-400 border-t border-slate-600 pt-2">
                 <span className="flex items-center gap-2">

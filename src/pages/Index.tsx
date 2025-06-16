@@ -40,21 +40,25 @@ const Index = () => {
     ));
   };
 
-  const handleBookRoom = (roomId: string, customerName: string, hours: number) => {
+  const handleBookRoom = (roomId: string, customerName: string, hours: number, mode: 'single' | 'multiplayer') => {
     const now = new Date();
     const endTime = new Date(now.getTime() + hours * 60 * 60 * 1000);
+    const room = rooms.find(r => r.id === roomId);
+    
+    if (!room) return;
     
     setRooms(rooms.map(room => 
       room.id === roomId 
         ? { 
             ...room, 
+            mode, // Set the selected mode
             status: 'occupied',
             currentSession: {
               customerName,
               startTime: now,
               endTime,
               hours,
-              totalCost: hours * room.pricing[room.mode],
+              totalCost: hours * room.pricing[mode], // Use selected mode for pricing
               products: []
             }
           }
