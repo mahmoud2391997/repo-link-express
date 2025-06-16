@@ -62,26 +62,26 @@ export interface CafeProduct {
 export const createAppointment = async (appointment: Omit<Appointment, 'id' | 'created_at' | 'updated_at'>) => {
   const { data, error } = await supabase.from('appointments').insert(appointment).select().single();
   if (error) throw error;
-  return data;
+  return data as Appointment;
 };
 
 export const getAppointments = async () => {
   const { data, error } = await supabase.from('appointments').select('*').order('appointment_date', { ascending: true });
   if (error) throw error;
-  return data;
+  return data as Appointment[];
 };
 
 export const updateAppointment = async (id: string, updates: Partial<Appointment>) => {
   const { data, error } = await supabase.from('appointments').update(updates).eq('id', id).select().single();
   if (error) throw error;
-  return data;
+  return data as Appointment;
 };
 
 // Orders
 export const createOrder = async (order: Omit<Order, 'id' | 'created_at' | 'updated_at'>) => {
   const { data, error } = await supabase.from('orders').insert(order).select().single();
   if (error) throw error;
-  return data;
+  return data as Order;
 };
 
 export const getOrders = async (status?: string) => {
@@ -103,21 +103,21 @@ export const getOrders = async (status?: string) => {
 export const updateOrder = async (id: string, updates: Partial<Order>) => {
   const { data, error } = await supabase.from('orders').update(updates).eq('id', id).select().single();
   if (error) throw error;
-  return data;
+  return data as Order;
 };
 
 // Order Items
 export const createOrderItem = async (item: Omit<OrderItem, 'id' | 'created_at'>) => {
   const { data, error } = await supabase.from('order_items').insert(item).select().single();
   if (error) throw error;
-  return data;
+  return data as OrderItem;
 };
 
 // Transactions
 export const createTransaction = async (transaction: Omit<Transaction, 'id' | 'created_at'>) => {
   const { data, error } = await supabase.from('transactions').insert(transaction).select().single();
   if (error) throw error;
-  return data;
+  return data as Transaction;
 };
 
 export const getTransactions = async (startDate?: string, endDate?: string) => {
@@ -139,22 +139,22 @@ export const getTransactions = async (startDate?: string, endDate?: string) => {
 };
 
 // Cafe Products
-export const getCafeProducts = async () => {
+export const getCafeProducts = async (): Promise<CafeProduct[]> => {
   const { data, error } = await supabase.from('cafe_products').select('*').eq('active', true).order('category');
   if (error) throw error;
-  return data;
+  return data as CafeProduct[];
 };
 
 export const updateCafeProduct = async (id: string, updates: Partial<CafeProduct>) => {
   const { data, error } = await supabase.from('cafe_products').update(updates).eq('id', id).select().single();
   if (error) throw error;
-  return data;
+  return data as CafeProduct;
 };
 
 export const createCafeProduct = async (product: Omit<CafeProduct, 'id' | 'created_at' | 'updated_at'>) => {
   const { data, error } = await supabase.from('cafe_products').insert(product).select().single();
   if (error) throw error;
-  return data;
+  return data as CafeProduct;
 };
 
 // Reports

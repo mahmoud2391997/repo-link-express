@@ -23,15 +23,15 @@ const Reports = () => {
       const data = await getReportData(period);
       setReportData(data);
       
-      // Calculate stats
-      const totalRevenue = data.reduce((sum, tx) => sum + parseFloat(tx.amount), 0);
+      // Calculate stats - convert to numbers explicitly
+      const totalRevenue = data.reduce((sum, tx) => sum + Number(tx.amount), 0);
       const totalOrders = data.length;
       const roomRevenue = data
         .filter(tx => tx.orders?.order_type === 'room_reservation')
-        .reduce((sum, tx) => sum + parseFloat(tx.amount), 0);
+        .reduce((sum, tx) => sum + Number(tx.amount), 0);
       const cafeRevenue = data
         .filter(tx => tx.orders?.order_type === 'cafe_order')
-        .reduce((sum, tx) => sum + parseFloat(tx.amount), 0);
+        .reduce((sum, tx) => sum + Number(tx.amount), 0);
       
       setStats({ totalRevenue, totalOrders, roomRevenue, cafeRevenue });
     } catch (error) {
@@ -140,7 +140,7 @@ const Reports = () => {
                   </div>
                 </div>
                 <div className="text-green-400 font-bold">
-                  +{parseFloat(transaction.amount).toFixed(2)} EGP
+                  +{Number(transaction.amount).toFixed(2)} EGP
                 </div>
               </div>
             ))}

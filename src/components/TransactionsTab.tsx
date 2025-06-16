@@ -44,7 +44,7 @@ const TransactionsTab = () => {
   };
 
   const totalAmount = transactions.reduce((sum, tx) => 
-    sum + (tx.transaction_type === 'payment' ? parseFloat(tx.amount) : -parseFloat(tx.amount)), 0
+    sum + (tx.transaction_type === 'payment' ? Number(tx.amount) : -Number(tx.amount)), 0
   );
 
   return (
@@ -130,7 +130,7 @@ const TransactionsTab = () => {
                   transaction.transaction_type === 'payment' ? 'text-green-400' : 'text-red-400'
                 }`}>
                   {transaction.transaction_type === 'payment' ? '+' : '-'}
-                  {parseFloat(transaction.amount).toFixed(2)} EGP
+                  {Number(transaction.amount).toFixed(2)} EGP
                 </div>
               </div>
             ))}
