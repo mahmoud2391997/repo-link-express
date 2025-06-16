@@ -1,10 +1,10 @@
-
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { PlayIcon, StopCircleIcon, ClockIcon, UserIcon, GamepadIcon } from 'lucide-react';
 import { Room } from '@/data/roomsData';
+import { showSessionEndNotification } from '@/utils/notificationUtils';
 
 interface RoomCardProps {
   room: Room;
@@ -14,6 +14,7 @@ interface RoomCardProps {
 
 const RoomCard = ({ room, onStartSession, onStopSession }: RoomCardProps) => {
   const [timeRemaining, setTimeRemaining] = useState<string>('');
+  const [hasNotified, setHasNotified] = useState(false);
 
   useEffect(() => {
     if (room.status === 'occupied' && room.currentSession) {
@@ -24,7 +25,18 @@ const RoomCard = ({ room, onStartSession, onStopSession }: RoomCardProps) => {
         
         if (diff <= 0) {
           setTimeRemaining('EXPIRED');
+          
+          // Show notification only once when session expires
+          if (!hasNotified) {
+            showSessionEndNotification(room.name, room.currentSession!.customerName);
+            setHasNotified(true);
+          }
           return;
+        }
+        
+        // Reset notification flag if time is extended
+        if (hasNotified && diff > 0) {
+          setHasNotified(false);
         }
         
         const hours = Math.floor(diff / (1000 * 60 * 60));
@@ -35,8 +47,10 @@ const RoomCard = ({ room, onStartSession, onStopSession }: RoomCardProps) => {
       }, 1000);
 
       return () => clearInterval(timer);
+    } else {
+      setHasNotified(false);
     }
-  }, [room.status, room.currentSession]);
+  }, [room.status, room.currentSession, hasNotified]);
 
   const getStatusColor = () => {
     switch (room.status) {
@@ -84,14 +98,16 @@ const RoomCard = ({ room, onStartSession, onStopSession }: RoomCardProps) => {
         </div>
 
         {room.status === 'occupied' && room.currentSession && (
-          <div className="bg-slate-700 p-3 rounded-lg space-y-2">
+          <div className={`bg-slate-700 p-3 rounded-lg space-y-2 ${timeRemaining === 'EXPIRED' ? 'border-2 border-red-500 animate-pulse' : ''}`}>
             <div className="flex items-center gap-2 text-white">
               <UserIcon className="w-4 h-4" />
               <span className="text-sm">{room.currentSession.customerName}</span>
             </div>
             <div className="flex items-center gap-2 text-white">
               <ClockIcon className="w-4 h-4" />
-              <span className="text-sm font-mono">{timeRemaining}</span>
+              <span className={`text-sm font-mono ${timeRemaining === 'EXPIRED' ? 'text-red-400 font-bold' : ''}`}>
+                {timeRemaining}
+              </span>
             </div>
             <div className="text-sm text-green-400">
               Total: {room.currentSession.totalCost} EGP

@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { GamepadIcon, ClockIcon, DollarSignIcon } from 'lucide-react';
 import { Room } from '@/data/roomsData';
 
@@ -20,6 +21,20 @@ const BookingModal = ({ isOpen, onClose, room, onBook }: BookingModalProps) => {
   const [hours, setHours] = useState(1);
 
   if (!room) return null;
+
+  const timeOptions = [
+    { value: 0.5, label: '30 minutes' },
+    { value: 1, label: '1 hour' },
+    { value: 1.5, label: '1.5 hours' },
+    { value: 2, label: '2 hours' },
+    { value: 2.5, label: '2.5 hours' },
+    { value: 3, label: '3 hours' },
+    { value: 4, label: '4 hours' },
+    { value: 5, label: '5 hours' },
+    { value: 6, label: '6 hours' },
+    { value: 8, label: '8 hours' },
+    { value: 12, label: '12 hours' }
+  ];
 
   const calculateCost = () => {
     return hours * room.pricing[room.mode];
@@ -68,16 +83,23 @@ const BookingModal = ({ isOpen, onClose, room, onBook }: BookingModalProps) => {
             </div>
 
             <div>
-              <Label htmlFor="hours" className="text-white">Hours</Label>
-              <Input
-                id="hours"
-                type="number"
-                min="1"
-                max="12"
-                value={hours}
-                onChange={(e) => setHours(parseInt(e.target.value) || 1)}
-                className="bg-slate-700 border-slate-600 text-white"
-              />
+              <Label className="text-white">Duration</Label>
+              <Select value={hours.toString()} onValueChange={(value) => setHours(parseFloat(value))}>
+                <SelectTrigger className="bg-slate-700 border-slate-600 text-white">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="bg-slate-700 border-slate-600">
+                  {timeOptions.map((option) => (
+                    <SelectItem 
+                      key={option.value} 
+                      value={option.value.toString()}
+                      className="text-white hover:bg-slate-600"
+                    >
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
             <div className="bg-slate-700 p-4 rounded-lg space-y-2">

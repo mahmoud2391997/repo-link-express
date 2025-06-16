@@ -1,5 +1,4 @@
-
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -9,11 +8,17 @@ import RoomCard from '@/components/RoomCard';
 import BookingModal from '@/components/BookingModal';
 import CafeSection from '@/components/CafeSection';
 import { Room, roomsData } from '@/data/roomsData';
+import { requestNotificationPermission } from '@/utils/notificationUtils';
 
 const Index = () => {
   const [rooms, setRooms] = useState<Room[]>(roomsData);
   const [selectedRoom, setSelectedRoom] = useState<Room | null>(null);
   const [isBookingModalOpen, setIsBookingModalOpen] = useState(false);
+
+  // Request notification permission on component mount
+  useEffect(() => {
+    requestNotificationPermission();
+  }, []);
 
   const activeRooms = rooms.filter(room => room.status === 'occupied').length;
   const availableRooms = rooms.filter(room => room.status === 'available').length;
