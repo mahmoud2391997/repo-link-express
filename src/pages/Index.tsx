@@ -1,12 +1,17 @@
+
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { GamepadIcon, CoffeeIcon, BarChart3Icon, PlayIcon, PauseIcon, StopCircleIcon } from 'lucide-react';
+import { GamepadIcon, CoffeeIcon, BarChart3Icon, PlayIcon, CalendarIcon, ShoppingCartIcon, CreditCardIcon } from 'lucide-react';
 import RoomCard from '@/components/RoomCard';
 import BookingModal from '@/components/BookingModal';
+import AppointmentModal from '@/components/AppointmentModal';
 import CafeSection from '@/components/CafeSection';
+import Reports from '@/components/Reports';
+import CurrentOrders from '@/components/CurrentOrders';
+import TransactionsTab from '@/components/TransactionsTab';
 import { Room, roomsData } from '@/data/roomsData';
 import { requestNotificationPermission } from '@/utils/notificationUtils';
 
@@ -14,6 +19,7 @@ const Index = () => {
   const [rooms, setRooms] = useState<Room[]>(roomsData);
   const [selectedRoom, setSelectedRoom] = useState<Room | null>(null);
   const [isBookingModalOpen, setIsBookingModalOpen] = useState(false);
+  const [isAppointmentModalOpen, setIsAppointmentModalOpen] = useState(false);
 
   // Request notification permission on component mount
   useEffect(() => {
@@ -29,6 +35,14 @@ const Index = () => {
     if (room) {
       setSelectedRoom(room);
       setIsBookingModalOpen(true);
+    }
+  };
+
+  const handleScheduleAppointment = (roomId: string) => {
+    const room = rooms.find(r => r.id === roomId);
+    if (room) {
+      setSelectedRoom(room);
+      setIsAppointmentModalOpen(true);
     }
   };
 
@@ -51,20 +65,25 @@ const Index = () => {
       room.id === roomId 
         ? { 
             ...room, 
-            mode, // Set the selected mode
+            mode,
             status: 'occupied',
             currentSession: {
               customerName,
               startTime: now,
               endTime,
               hours,
-              totalCost: hours * room.pricing[mode], // Use selected mode for pricing
+              totalCost: hours * room.pricing[mode],
               products: []
             }
           }
         : room
     ));
     setIsBookingModalOpen(false);
+    setSelectedRoom(null);
+  };
+
+  const handleAppointmentCreated = () => {
+    setIsAppointmentModalOpen(false);
     setSelectedRoom(null);
   };
 
@@ -138,10 +157,22 @@ const Index = () => {
 
         {/* Main Content */}
         <Tabs defaultValue="rooms" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-3 bg-slate-800 border-0">
+          <TabsList className="grid w-full grid-cols-6 bg-slate-800 border-0">
             <TabsTrigger value="rooms" className="data-[state=active]:bg-blue-600 text-white">
               <GamepadIcon className="w-4 h-4 mr-2" />
               Rooms
+            </TabsTrigger>
+            <TabsTrigger value="appointments" className="data-[state=active]:bg-blue-600 text-white">
+              <CalendarIcon className="w-4 h-4 mr-2" />
+              Appointments
+            </TabsTrigger>
+            <TabsTrigger value="current-orders" className="data-[state=active]:bg-blue-600 text-white">
+              <ShoppingCartIcon className="w-4 h-4 mr-2" />
+              Current Orders
+            </TabsTrigger>
+            <TabsTrigger value="transactions" className="data-[state=active]:bg-blue-600 text-white">
+              <CreditCardIcon className="w-4 h-4 mr-2" />
+              Transactions
             </TabsTrigger>
             <TabsTrigger value="cafe" className="data-[state=active]:bg-blue-600 text-white">
               <CoffeeIcon className="w-4 h-4 mr-2" />
@@ -156,14 +187,44 @@ const Index = () => {
           <TabsContent value="rooms" className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
               {rooms.map((room) => (
-                <RoomCard
-                  key={room.id}
-                  room={room}
-                  onStartSession={handleStartSession}
-                  onStopSession={handleStopSession}
-                />
+                <div key={room.id} className="space-y-3">
+                  <RoomCard
+                    room={room}
+                    onStartSession={handleStartSession}
+                    onStopSession={handleStopSession}
+                  />
+                  {room.status === 'available' && (
+                    <Button 
+                      onClick={() => handleScheduleAppointment(room.id)}
+                      variant="outline"
+                      className="w-full text-white border-slate-500 hover:bg-slate-700"
+                    >
+                      <CalendarIcon className="w-4 h-4 mr-2" />
+                      Schedule Appointment
+                    </Button>
+                  )}
+                </div>
               ))}
             </div>
+          </TabsContent>
+
+          <TabsContent value="appointments">
+            <Card className="bg-slate-800 border-slate-700">
+              <CardHeader>
+                <CardTitle className="text-white">Appointments Management</CardTitle>
+              </CardHeader>
+              <CardContent className="text-white">
+                <p>Appointments functionality - appointments are created through room cards</p>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="current-orders">
+            <CurrentOrders />
+          </TabsContent>
+
+          <TabsContent value="transactions">
+            <TransactionsTab />
           </TabsContent>
 
           <TabsContent value="cafe">
@@ -171,14 +232,7 @@ const Index = () => {
           </TabsContent>
 
           <TabsContent value="reports">
-            <Card className="bg-slate-800 border-slate-700">
-              <CardHeader>
-                <CardTitle className="text-white">Reports & Analytics</CardTitle>
-              </CardHeader>
-              <CardContent className="text-white">
-                <p>Reports functionality coming soon...</p>
-              </CardContent>
-            </Card>
+            <Reports />
           </TabsContent>
         </Tabs>
 
@@ -191,6 +245,17 @@ const Index = () => {
           }}
           room={selectedRoom}
           onBook={handleBookRoom}
+        />
+
+        {/* Appointment Modal */}
+        <AppointmentModal
+          isOpen={isAppointmentModalOpen}
+          onClose={() => {
+            setIsAppointmentModalOpen(false);
+            setSelectedRoom(null);
+          }}
+          room={selectedRoom}
+          onAppointmentCreated={handleAppointmentCreated}
         />
       </div>
     </div>

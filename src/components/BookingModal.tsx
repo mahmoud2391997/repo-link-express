@@ -7,8 +7,10 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { GamepadIcon, ClockIcon, DollarSignIcon, UserIcon, UsersIcon } from 'lucide-react';
+import { GamepadIcon, ClockIcon, DollarSignIcon, UserIcon, UsersIcon, PlusIcon } from 'lucide-react';
 import { Room } from '@/data/roomsData';
+import { createOrder, createOrderItem, getCafeProducts, CafeProduct } from '@/services/supabaseService';
+import { useToast } from '@/hooks/use-toast';
 
 interface BookingModalProps {
   isOpen: boolean;
@@ -21,6 +23,11 @@ const BookingModal = ({ isOpen, onClose, room, onBook }: BookingModalProps) => {
   const [customerName, setCustomerName] = useState('');
   const [hours, setHours] = useState(1);
   const [selectedMode, setSelectedMode] = useState<'single' | 'multiplayer'>('single');
+  const [cafeProducts, setCafeProducts] = useState<CafeProduct[]>([]);
+  const [selectedProducts, setSelectedProducts] = useState<{[key: string]: number}>({});
+  const [showCafeSection, setShowCafeSection] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const { toast } = useToast();
 
   if (!room) return null;
 
@@ -38,23 +45,112 @@ const BookingModal = ({ isOpen, onClose, room, onBook }: BookingModalProps) => {
     { value: 12, label: '12 hours' }
   ];
 
-  const calculateCost = () => {
+  const loadCafeProducts = async () => {
+    try {
+      const products = await getCafeProducts();
+      setCafeProducts(products);
+      setShowCafeSection(true);
+    } catch (error) {
+      console.error('Error loading cafe products:', error);
+    }
+  };
+
+  const calculateRoomCost = () => {
     return hours * room.pricing[selectedMode];
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const calculateCafeCost = () => {
+    return Object.entries(selectedProducts).reduce((total, [productId, quantity]) => {
+      const product = cafeProducts.find(p => p.id === productId);
+      return total + (product ? product.price * quantity : 0);
+    }, 0);
+  };
+
+  const calculateTotalCost = () => {
+    return calculateRoomCost() + calculateCafeCost();
+  };
+
+  const handleProductQuantityChange = (productId: string, quantity: number) => {
+    setSelectedProducts(prev => ({
+      ...prev,
+      [productId]: quantity
+    }));
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (customerName.trim()) {
+    if (!customerName.trim()) return;
+
+    setIsLoading(true);
+    try {
+      const orderType = Object.keys(selectedProducts).length > 0 ? 'combo' : 'room_reservation';
+      const totalAmount = calculateTotalCost();
+      
+      // Create the order
+      const order = await createOrder({
+        room_id: room.id,
+        customer_name: customerName.trim(),
+        order_type: orderType,
+        total_amount: totalAmount,
+        status: 'active',
+        start_time: new Date().toISOString()
+      });
+
+      // Add room time as order item
+      await createOrderItem({
+        order_id: order.id,
+        item_type: 'room_time',
+        item_name: `${room.name} - ${selectedMode} (${hours}h)`,
+        quantity: 1,
+        unit_price: calculateRoomCost(),
+        total_price: calculateRoomCost()
+      });
+
+      // Add cafe products as order items
+      for (const [productId, quantity] of Object.entries(selectedProducts)) {
+        if (quantity > 0) {
+          const product = cafeProducts.find(p => p.id === productId);
+          if (product) {
+            await createOrderItem({
+              order_id: order.id,
+              item_type: 'cafe_product',
+              item_name: product.name,
+              quantity: quantity,
+              unit_price: product.price,
+              total_price: product.price * quantity
+            });
+          }
+        }
+      }
+
+      // Update local room state
       onBook(room.id, customerName.trim(), hours, selectedMode);
+      
+      toast({
+        title: "Session Started",
+        description: `Room session started for ${customerName} with order total of ${totalAmount} EGP`,
+      });
+      
       setCustomerName('');
       setHours(1);
       setSelectedMode('single');
+      setSelectedProducts({});
+      setShowCafeSection(false);
+    } catch (error) {
+      console.error('Error creating order:', error);
+      toast({
+        title: "Error",
+        description: "Failed to start session",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
     }
   };
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="bg-slate-800 border-slate-700 text-white max-w-md">
+      <DialogContent className="bg-slate-800 border-slate-700 text-white max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <GamepadIcon className="w-5 h-5" />
@@ -128,31 +224,71 @@ const BookingModal = ({ isOpen, onClose, room, onBook }: BookingModalProps) => {
               </Select>
             </div>
 
+            {/* Add Cafe Section */}
+            {!showCafeSection ? (
+              <Button 
+                type="button" 
+                onClick={loadCafeProducts}
+                className="w-full bg-orange-600 hover:bg-orange-700"
+              >
+                <PlusIcon className="w-4 h-4 mr-2" />
+                Add Café Items
+              </Button>
+            ) : (
+              <div className="space-y-4 border-t border-slate-600 pt-4">
+                <h4 className="text-white font-medium">Café Items</h4>
+                <div className="grid grid-cols-1 gap-3 max-h-48 overflow-y-auto">
+                  {cafeProducts.map((product) => (
+                    <div key={product.id} className="flex items-center justify-between p-3 bg-slate-700 rounded-lg">
+                      <div className="text-white">
+                        <div className="font-medium">{product.name}</div>
+                        <div className="text-sm text-gray-300">{product.price} EGP</div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleProductQuantityChange(product.id!, Math.max(0, (selectedProducts[product.id!] || 0) - 1))}
+                        >
+                          -
+                        </Button>
+                        <span className="text-white w-8 text-center">{selectedProducts[product.id!] || 0}</span>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleProductQuantityChange(product.id!, (selectedProducts[product.id!] || 0) + 1)}
+                        >
+                          +
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             <div className="bg-slate-700 p-4 rounded-lg space-y-2">
               <div className="flex items-center justify-between">
                 <span className="flex items-center gap-2">
                   <ClockIcon className="w-4 h-4" />
-                  Duration:
+                  Room Cost:
                 </span>
-                <span>{hours} hour(s)</span>
+                <span>{calculateRoomCost()} EGP</span>
               </div>
-              <div className="flex items-center justify-between">
-                <span>Mode:</span>
-                <span className="flex items-center gap-1">
-                  {selectedMode === 'single' ? <UserIcon className="w-4 h-4" /> : <UsersIcon className="w-4 h-4" />}
-                  {selectedMode === 'single' ? 'Single Player' : 'Multiplayer'}
-                </span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span>Rate:</span>
-                <span>{room.pricing[selectedMode]} EGP/hr</span>
-              </div>
+              {calculateCafeCost() > 0 && (
+                <div className="flex items-center justify-between">
+                  <span>Café Cost:</span>
+                  <span>{calculateCafeCost()} EGP</span>
+                </div>
+              )}
               <div className="flex items-center justify-between text-lg font-bold text-green-400 border-t border-slate-600 pt-2">
                 <span className="flex items-center gap-2">
                   <DollarSignIcon className="w-4 h-4" />
                   Total:
                 </span>
-                <span>{calculateCost()} EGP</span>
+                <span>{calculateTotalCost()} EGP</span>
               </div>
             </div>
 
@@ -160,8 +296,8 @@ const BookingModal = ({ isOpen, onClose, room, onBook }: BookingModalProps) => {
               <Button type="button" variant="outline" onClick={onClose} className="flex-1">
                 Cancel
               </Button>
-              <Button type="submit" className="flex-1 bg-green-600 hover:bg-green-700">
-                Start Session
+              <Button type="submit" disabled={isLoading} className="flex-1 bg-green-600 hover:bg-green-700">
+                {isLoading ? 'Starting...' : 'Start Session'}
               </Button>
             </div>
           </form>
