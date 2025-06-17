@@ -22,7 +22,7 @@ export const fetchRooms = createAsyncThunk('rooms/fetchRooms', async () => {
 
 export const addRoom = createAsyncThunk(
   'rooms/addRoom',
-  async (roomData: Omit<Room, 'id' | 'created_at' | 'updated_at'>) => {
+  async (roomData: Omit<Room, 'created_at' | 'updated_at'>) => {
     const newRoom = await createRoom(roomData);
     return newRoom;
   }
