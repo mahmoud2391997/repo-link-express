@@ -60,7 +60,7 @@ const OrdersManagement = () => {
     setIsItemsModalOpen(true);
   };
 
-  const handleUpdateOrderStatus = async (orderId: string, status: string) => {
+  const handleUpdateOrderStatus = async (orderId: string, status: 'active' | 'completed' | 'cancelled') => {
     try {
       await updateOrder(orderId, { status });
       toast({

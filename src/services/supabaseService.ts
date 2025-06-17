@@ -81,7 +81,7 @@ export const getRooms = async (): Promise<Room[]> => {
   return data as Room[];
 };
 
-export const createRoom = async (room: Omit<Room, 'id' | 'created_at' | 'updated_at'>) => {
+export const createRoom = async (room: Omit<Room, 'created_at' | 'updated_at'>) => {
   const { data, error } = await supabase.from('rooms').insert(room).select().single();
   if (error) throw error;
   return data as Room;
@@ -273,4 +273,48 @@ export const getReportData = async (period: 'daily' | 'weekly' | 'monthly') => {
     
   if (error) throw error;
   return transactions;
+};
+
+// Process Cafe Cart - Create order with items and transaction
+export const processCafeCart = async (
+  customerName: string,
+  cartItems: { id: string; name: string; price: number; quantity: number }[],
+  paymentMethod: 'cash' | 'card' | 'transfer' = 'cash'
+) => {
+  try {
+    const totalAmount = cartItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+    
+    // Create order
+    const order = await createOrder({
+      customer_name: customerName,
+      order_type: 'cafe_order',
+      total_amount: totalAmount,
+      status: 'active'
+    });
+
+    // Create order items
+    for (const item of cartItems) {
+      await createOrderItem({
+        order_id: order.id!,
+        item_type: 'cafe_product',
+        item_name: item.name,
+        quantity: item.quantity,
+        unit_price: item.price,
+        total_price: item.price * item.quantity
+      });
+    }
+
+    // Create transaction
+    await createTransaction({
+      order_id: order.id!,
+      transaction_type: 'payment',
+      amount: totalAmount,
+      payment_method: paymentMethod,
+      description: `Cafe order for ${customerName}`
+    });
+
+    return order;
+  } catch (error) {
+    throw error;
+  }
 };

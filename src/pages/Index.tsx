@@ -1,307 +1,53 @@
-import { useState, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
+
+import { useState } from 'react';
+import { User } from '@supabase/supabase-js';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { GamepadIcon, CoffeeIcon, BarChart3Icon, PlayIcon, CalendarIcon, ShoppingCartIcon, CreditCardIcon, SettingsIcon } from 'lucide-react';
-import RoomCard from '@/components/RoomCard';
-import BookingModal from '@/components/BookingModal';
-import AppointmentModal from '@/components/AppointmentModal';
-import CafeSection from '@/components/CafeSection';
-import Reports from '@/components/Reports';
-import CurrentOrders from '@/components/CurrentOrders';
-import TransactionsTab from '@/components/TransactionsTab';
+import { Button } from '@/components/ui/button';
+import { LogOutIcon, SettingsIcon } from 'lucide-react';
 import AdminDashboard from '@/components/AdminDashboard';
-import { getRooms, Room as DatabaseRoom } from '@/services/supabaseService';
-import { Room, roomsData } from '@/data/roomsData';
-import { requestNotificationPermission } from '@/utils/notificationUtils';
+import Reports from '@/components/Reports';
 
-const Index = () => {
-  const [rooms, setRooms] = useState<Room[]>(roomsData);
-  const [databaseRooms, setDatabaseRooms] = useState<DatabaseRoom[]>([]);
-  const [selectedRoom, setSelectedRoom] = useState<Room | null>(null);
-  const [isBookingModalOpen, setIsBookingModalOpen] = useState(false);
-  const [isAppointmentModalOpen, setIsAppointmentModalOpen] = useState(false);
+interface IndexProps {
+  user: User;
+  onSignOut: () => void;
+}
 
-  // Request notification permission on component mount
-  useEffect(() => {
-    requestNotificationPermission();
-    loadDatabaseRooms();
-  }, []);
-
-  const loadDatabaseRooms = async () => {
-    try {
-      const dbRooms = await getRooms();
-      setDatabaseRooms(dbRooms);
-      
-      // Sync local rooms with database rooms
-      const syncedRooms = rooms.map(localRoom => {
-        const dbRoom = dbRooms.find(db => db.id === localRoom.id);
-        if (dbRoom) {
-          return {
-            ...localRoom,
-            status: dbRoom.status as 'available' | 'occupied' | 'cleaning',
-            currentSession: dbRoom.current_customer_name ? {
-              customerName: dbRoom.current_customer_name,
-              startTime: new Date(dbRoom.current_session_start!),
-              endTime: new Date(dbRoom.current_session_end!),
-              hours: 0, // Will be calculated
-              totalCost: dbRoom.current_total_cost || 0,
-              products: []
-            } : null
-          };
-        }
-        return localRoom;
-      });
-      setRooms(syncedRooms);
-    } catch (error) {
-      console.error('Error loading database rooms:', error);
-    }
-  };
-
-  const activeRooms = databaseRooms.filter(room => room.status === 'occupied').length;
-  const availableRooms = databaseRooms.filter(room => room.status === 'available').length;
-  const totalRevenue = databaseRooms.reduce((sum, room) => sum + (room.current_total_cost || 0), 0);
-
-  const handleStartSession = (roomId: string) => {
-    const room = rooms.find(r => r.id === roomId);
-    if (room) {
-      setSelectedRoom(room);
-      setIsBookingModalOpen(true);
-    }
-  };
-
-  const handleScheduleAppointment = (roomId: string) => {
-    const room = rooms.find(r => r.id === roomId);
-    if (room) {
-      setSelectedRoom(room);
-      setIsAppointmentModalOpen(true);
-    }
-  };
-
-  const handleStopSession = (roomId: string) => {
-    setRooms(rooms.map(room => 
-      room.id === roomId 
-        ? { ...room, status: 'available', currentSession: null }
-        : room
-    ));
-    // Reload database rooms to sync
-    loadDatabaseRooms();
-  };
-
-  const handleBookRoom = (roomId: string, customerName: string, hours: number, mode: 'single' | 'multiplayer') => {
-    const now = new Date();
-    const endTime = new Date(now.getTime() + hours * 60 * 60 * 1000);
-    const room = rooms.find(r => r.id === roomId);
-    
-    if (!room) return;
-    
-    setRooms(rooms.map(room => 
-      room.id === roomId 
-        ? { 
-            ...room, 
-            mode,
-            status: 'occupied',
-            currentSession: {
-              customerName,
-              startTime: now,
-              endTime,
-              hours,
-              totalCost: hours * room.pricing[mode],
-              products: []
-            }
-          }
-        : room
-    ));
-    setIsBookingModalOpen(false);
-    setSelectedRoom(null);
-    // Reload database rooms to sync
-    setTimeout(() => loadDatabaseRooms(), 1000);
-  };
-
-  const handleAppointmentCreated = () => {
-    setIsAppointmentModalOpen(false);
-    setSelectedRoom(null);
-  };
-
+const Index = ({ user, onSignOut }: IndexProps) => {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900">
-      <div className="container mx-auto p-6">
+    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-slate-900 to-black">
+      <div className="container mx-auto px-4 py-6">
         {/* Header */}
         <div className="flex items-center justify-between mb-8">
           <div>
-            <h1 className="text-4xl font-bold text-white mb-2">Game Zone Manager</h1>
-            <p className="text-blue-200">Complete gaming center management system</p>
+            <h1 className="text-3xl font-bold text-white">Zone 14 Gaming Center</h1>
+            <p className="text-gray-400">Welcome back, {user.email}</p>
           </div>
-          <div className="flex gap-2">
-            <Badge variant="secondary" className="text-lg px-4 py-2">
-              <GamepadIcon className="w-5 h-5 mr-2" />
-              {activeRooms} Active
-            </Badge>
-            <Badge variant="outline" className="text-lg px-4 py-2 text-white border-white">
-              <PlayIcon className="w-5 h-5 mr-2" />
-              {availableRooms} Available
-            </Badge>
-          </div>
-        </div>
-
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-          <Card className="bg-gradient-to-r from-blue-600 to-blue-700 border-0 text-white">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Active Rooms</CardTitle>
-              <GamepadIcon className="h-4 w-4" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{activeRooms}</div>
-              <p className="text-xs text-blue-100">out of {databaseRooms.length} rooms</p>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-gradient-to-r from-green-600 to-green-700 border-0 text-white">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Today's Revenue</CardTitle>
-              <BarChart3Icon className="h-4 w-4" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{totalRevenue.toFixed(2)} EGP</div>
-              <p className="text-xs text-green-100">Current active sessions</p>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-gradient-to-r from-purple-600 to-purple-700 border-0 text-white">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Rooms</CardTitle>
-              <PlayIcon className="h-4 w-4" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{databaseRooms.length}</div>
-              <p className="text-xs text-purple-100">gaming stations</p>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-gradient-to-r from-orange-600 to-orange-700 border-0 text-white">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Café Sales</CardTitle>
-              <CoffeeIcon className="h-4 w-4" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">1,250 EGP</div>
-              <p className="text-xs text-orange-100">45 items sold</p>
-            </CardContent>
-          </Card>
+          <Button onClick={onSignOut} variant="outline" className="text-white border-white hover:bg-white hover:text-black">
+            <LogOutIcon className="w-4 h-4 mr-2" />
+            Sign Out
+          </Button>
         </div>
 
         {/* Main Content */}
-        <Tabs defaultValue="rooms" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-7 bg-slate-800 border-0">
-            <TabsTrigger value="rooms" className="data-[state=active]:bg-blue-600 text-white">
-              <GamepadIcon className="w-4 h-4 mr-2" />
-              Rooms
-            </TabsTrigger>
-            <TabsTrigger value="appointments" className="data-[state=active]:bg-blue-600 text-white">
-              <CalendarIcon className="w-4 h-4 mr-2" />
-              Appointments
-            </TabsTrigger>
-            <TabsTrigger value="current-orders" className="data-[state=active]:bg-blue-600 text-white">
-              <ShoppingCartIcon className="w-4 h-4 mr-2" />
-              Current Orders
-            </TabsTrigger>
-            <TabsTrigger value="transactions" className="data-[state=active]:bg-blue-600 text-white">
-              <CreditCardIcon className="w-4 h-4 mr-2" />
-              Transactions
-            </TabsTrigger>
-            <TabsTrigger value="cafe" className="data-[state=active]:bg-blue-600 text-white">
-              <CoffeeIcon className="w-4 h-4 mr-2" />
-              Café & Canteen
-            </TabsTrigger>
-            <TabsTrigger value="reports" className="data-[state=active]:bg-blue-600 text-white">
-              <BarChart3Icon className="w-4 h-4 mr-2" />
-              Reports
-            </TabsTrigger>
+        <Tabs defaultValue="admin" className="space-y-6">
+          <TabsList className="grid w-full grid-cols-2 bg-slate-800 border-0 max-w-md">
             <TabsTrigger value="admin" className="data-[state=active]:bg-blue-600 text-white">
               <SettingsIcon className="w-4 h-4 mr-2" />
-              Admin
+              Admin Panel
+            </TabsTrigger>
+            <TabsTrigger value="reports" className="data-[state=active]:bg-blue-600 text-white">
+              Reports
             </TabsTrigger>
           </TabsList>
 
-          <TabsContent value="rooms" className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-              {rooms.map((room) => (
-                <div key={room.id} className="space-y-3">
-                  <RoomCard
-                    room={room}
-                    onStartSession={handleStartSession}
-                    onStopSession={handleStopSession}
-                  />
-                  {room.status === 'available' && (
-                    <Button 
-                      onClick={() => handleScheduleAppointment(room.id)}
-                      variant="outline"
-                      className="w-full text-white border-slate-500 hover:bg-slate-700"
-                    >
-                      <CalendarIcon className="w-4 h-4 mr-2" />
-                      Schedule Appointment
-                    </Button>
-                  )}
-                </div>
-              ))}
-            </div>
-          </TabsContent>
-
-          <TabsContent value="appointments">
-            <Card className="bg-slate-800 border-slate-700">
-              <CardHeader>
-                <CardTitle className="text-white">Appointments Management</CardTitle>
-              </CardHeader>
-              <CardContent className="text-white">
-                <p>Appointments functionality - appointments are created through room cards</p>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="current-orders">
-            <CurrentOrders />
-          </TabsContent>
-
-          <TabsContent value="transactions">
-            <TransactionsTab />
-          </TabsContent>
-
-          <TabsContent value="cafe">
-            <CafeSection />
+          <TabsContent value="admin">
+            <AdminDashboard />
           </TabsContent>
 
           <TabsContent value="reports">
             <Reports />
           </TabsContent>
-
-          <TabsContent value="admin">
-            <AdminDashboard />
-          </TabsContent>
         </Tabs>
-
-        {/* Booking Modal */}
-        <BookingModal
-          isOpen={isBookingModalOpen}
-          onClose={() => {
-            setIsBookingModalOpen(false);
-            setSelectedRoom(null);
-          }}
-          room={selectedRoom}
-          onBook={handleBookRoom}
-        />
-
-        {/* Appointment Modal */}
-        <AppointmentModal
-          isOpen={isAppointmentModalOpen}
-          onClose={() => {
-            setIsAppointmentModalOpen(false);
-            setSelectedRoom(null);
-          }}
-          room={selectedRoom}
-          onAppointmentCreated={handleAppointmentCreated}
-        />
       </div>
     </div>
   );

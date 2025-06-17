@@ -11,6 +11,7 @@ import { Switch } from '@/components/ui/switch';
 import { PlusIcon, EditIcon, TrashIcon, CoffeeIcon } from 'lucide-react';
 import { getCafeProducts, createCafeProduct, updateCafeProduct, deleteCafeProduct, CafeProduct } from '@/services/supabaseService';
 import { useToast } from '@/hooks/use-toast';
+import CafeCartProcessor from './CafeCartProcessor';
 
 const CafeManagement = () => {
   const [products, setProducts] = useState<CafeProduct[]>([]);
@@ -138,90 +139,93 @@ const CafeManagement = () => {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h3 className="text-xl font-bold text-white">Café Products Management</h3>
-        <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-          <DialogTrigger asChild>
-            <Button onClick={resetForm} className="bg-blue-600 hover:bg-blue-700">
-              <PlusIcon className="w-4 h-4 mr-2" />
-              Add Product
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="bg-slate-800 border-slate-700 text-white">
-            <DialogHeader>
-              <DialogTitle>{editingProduct ? 'Edit Product' : 'Add New Product'}</DialogTitle>
-            </DialogHeader>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div>
-                <Label htmlFor="name">Product Name</Label>
-                <Input
-                  id="name"
-                  value={formData.name}
-                  onChange={(e) => setFormData({...formData, name: e.target.value})}
-                  className="bg-slate-700 border-slate-600 text-white"
-                  required
-                />
-              </div>
-
-              <div>
-                <Label>Category</Label>
-                <Select value={formData.category} onValueChange={(value: 'drinks' | 'snacks' | 'meals') => setFormData({...formData, category: value})}>
-                  <SelectTrigger className="bg-slate-700 border-slate-600 text-white">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent className="bg-slate-700 border-slate-600">
-                    <SelectItem value="drinks" className="text-white">Drinks</SelectItem>
-                    <SelectItem value="snacks" className="text-white">Snacks</SelectItem>
-                    <SelectItem value="meals" className="text-white">Meals</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
+        <div className="flex gap-4">
+          <CafeCartProcessor cafeProducts={products} onOrderProcessed={loadProducts} />
+          <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
+            <DialogTrigger asChild>
+              <Button onClick={resetForm} className="bg-blue-600 hover:bg-blue-700">
+                <PlusIcon className="w-4 h-4 mr-2" />
+                Add Product
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="bg-slate-800 border-slate-700 text-white">
+              <DialogHeader>
+                <DialogTitle>{editingProduct ? 'Edit Product' : 'Add New Product'}</DialogTitle>
+              </DialogHeader>
+              <form onSubmit={handleSubmit} className="space-y-4">
                 <div>
-                  <Label htmlFor="price">Price (EGP)</Label>
+                  <Label htmlFor="name">Product Name</Label>
                   <Input
-                    id="price"
-                    type="number"
-                    step="0.01"
-                    value={formData.price}
-                    onChange={(e) => setFormData({...formData, price: parseFloat(e.target.value)})}
+                    id="name"
+                    value={formData.name}
+                    onChange={(e) => setFormData({...formData, name: e.target.value})}
                     className="bg-slate-700 border-slate-600 text-white"
                     required
                   />
                 </div>
-                
+
                 <div>
-                  <Label htmlFor="stock">Stock</Label>
-                  <Input
-                    id="stock"
-                    type="number"
-                    value={formData.stock}
-                    onChange={(e) => setFormData({...formData, stock: parseInt(e.target.value)})}
-                    className="bg-slate-700 border-slate-600 text-white"
-                    required
-                  />
+                  <Label>Category</Label>
+                  <Select value={formData.category} onValueChange={(value: 'drinks' | 'snacks' | 'meals') => setFormData({...formData, category: value})}>
+                    <SelectTrigger className="bg-slate-700 border-slate-600 text-white">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="bg-slate-700 border-slate-600">
+                      <SelectItem value="drinks" className="text-white">Drinks</SelectItem>
+                      <SelectItem value="snacks" className="text-white">Snacks</SelectItem>
+                      <SelectItem value="meals" className="text-white">Meals</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
-              </div>
 
-              <div className="flex items-center space-x-2">
-                <Switch
-                  id="active"
-                  checked={formData.active}
-                  onCheckedChange={(checked) => setFormData({...formData, active: checked})}
-                />
-                <Label htmlFor="active">Active</Label>
-              </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="price">Price (EGP)</Label>
+                    <Input
+                      id="price"
+                      type="number"
+                      step="0.01"
+                      value={formData.price}
+                      onChange={(e) => setFormData({...formData, price: parseFloat(e.target.value)})}
+                      className="bg-slate-700 border-slate-600 text-white"
+                      required
+                    />
+                  </div>
+                  
+                  <div>
+                    <Label htmlFor="stock">Stock</Label>
+                    <Input
+                      id="stock"
+                      type="number"
+                      value={formData.stock}
+                      onChange={(e) => setFormData({...formData, stock: parseInt(e.target.value)})}
+                      className="bg-slate-700 border-slate-600 text-white"
+                      required
+                    />
+                  </div>
+                </div>
 
-              <div className="flex gap-2">
-                <Button type="button" variant="outline" onClick={() => setIsModalOpen(false)} className="flex-1">
-                  Cancel
-                </Button>
-                <Button type="submit" disabled={isLoading} className="flex-1 bg-green-600 hover:bg-green-700">
-                  {isLoading ? 'Saving...' : editingProduct ? 'Update' : 'Create'}
-                </Button>
-              </div>
-            </form>
-          </DialogContent>
-        </Dialog>
+                <div className="flex items-center space-x-2">
+                  <Switch
+                    id="active"
+                    checked={formData.active}
+                    onCheckedChange={(checked) => setFormData({...formData, active: checked})}
+                  />
+                  <Label htmlFor="active">Active</Label>
+                </div>
+
+                <div className="flex gap-2">
+                  <Button type="button" variant="outline" onClick={() => setIsModalOpen(false)} className="flex-1">
+                    Cancel
+                  </Button>
+                  <Button type="submit" disabled={isLoading} className="flex-1 bg-green-600 hover:bg-green-700">
+                    {isLoading ? 'Saving...' : editingProduct ? 'Update' : 'Create'}
+                  </Button>
+                </div>
+              </form>
+            </DialogContent>
+          </Dialog>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
