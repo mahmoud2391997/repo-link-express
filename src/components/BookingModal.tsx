@@ -1,5 +1,5 @@
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -8,8 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { GamepadIcon, ClockIcon, DollarSignIcon, UserIcon, UsersIcon, PlusIcon } from 'lucide-react';
-import { Room } from '@/data/roomsData';
-import { createOrder, createOrderItem, getCafeProducts, CafeProduct } from '@/services/supabaseService';
+import { createOrder, createOrderItem, createTransaction, getCafeProducts, CafeProduct, Room } from '@/services/supabaseService';
 import { useToast } from '@/hooks/use-toast';
 
 interface BookingModalProps {
@@ -26,6 +25,7 @@ const BookingModal = ({ isOpen, onClose, room, onBook }: BookingModalProps) => {
   const [cafeProducts, setCafeProducts] = useState<CafeProduct[]>([]);
   const [selectedProducts, setSelectedProducts] = useState<{[key: string]: number}>({});
   const [showCafeSection, setShowCafeSection] = useState(false);
+  const [paymentMethod, setPaymentMethod] = useState<'cash' | 'card' | 'transfer'>('cash');
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
 
@@ -48,7 +48,7 @@ const BookingModal = ({ isOpen, onClose, room, onBook }: BookingModalProps) => {
   const loadCafeProducts = async () => {
     try {
       const products = await getCafeProducts();
-      setCafeProducts(products);
+      setCafeProducts(products.filter(p => p.active && p.stock > 0));
       setShowCafeSection(true);
     } catch (error) {
       console.error('Error loading cafe products:', error);
@@ -56,7 +56,7 @@ const BookingModal = ({ isOpen, onClose, room, onBook }: BookingModalProps) => {
   };
 
   const calculateRoomCost = () => {
-    return hours * room.pricing[selectedMode];
+    return hours * (selectedMode === 'single' ? room.pricing_single : room.pricing_multiplayer);
   };
 
   const calculateCafeCost = () => {
@@ -85,6 +85,8 @@ const BookingModal = ({ isOpen, onClose, room, onBook }: BookingModalProps) => {
     try {
       const orderType = Object.keys(selectedProducts).length > 0 ? 'combo' : 'room_reservation';
       const totalAmount = calculateTotalCost();
+      const startTime = new Date();
+      const endTime = new Date(startTime.getTime() + (hours * 60 * 60 * 1000));
       
       // Create the order
       const order = await createOrder({
@@ -93,12 +95,13 @@ const BookingModal = ({ isOpen, onClose, room, onBook }: BookingModalProps) => {
         order_type: orderType,
         total_amount: totalAmount,
         status: 'active',
-        start_time: new Date().toISOString()
+        start_time: startTime.toISOString(),
+        end_time: endTime.toISOString()
       });
 
       // Add room time as order item
       await createOrderItem({
-        order_id: order.id,
+        order_id: order.id!,
         item_type: 'room_time',
         item_name: `${room.name} - ${selectedMode} (${hours}h)`,
         quantity: 1,
@@ -112,7 +115,7 @@ const BookingModal = ({ isOpen, onClose, room, onBook }: BookingModalProps) => {
           const product = cafeProducts.find(p => p.id === productId);
           if (product) {
             await createOrderItem({
-              order_id: order.id,
+              order_id: order.id!,
               item_type: 'cafe_product',
               item_name: product.name,
               quantity: quantity,
@@ -123,12 +126,21 @@ const BookingModal = ({ isOpen, onClose, room, onBook }: BookingModalProps) => {
         }
       }
 
+      // Create transaction
+      await createTransaction({
+        order_id: order.id!,
+        transaction_type: 'payment',
+        amount: totalAmount,
+        payment_method: paymentMethod,
+        description: `${orderType} for ${customerName.trim()} - ${room.name}`
+      });
+
       // Update local room state
       onBook(room.id, customerName.trim(), hours, selectedMode);
       
       toast({
         title: "Session Started",
-        description: `Room session started for ${customerName} with order total of ${totalAmount} EGP`,
+        description: `Room session started for ${customerName} at ${startTime.toLocaleTimeString()} with order total of ${totalAmount.toFixed(2)} EGP`,
       });
       
       setCustomerName('');
@@ -136,6 +148,8 @@ const BookingModal = ({ isOpen, onClose, room, onBook }: BookingModalProps) => {
       setSelectedMode('single');
       setSelectedProducts({});
       setShowCafeSection(false);
+      setPaymentMethod('cash');
+      onClose();
     } catch (error) {
       console.error('Error creating order:', error);
       toast({
@@ -160,8 +174,11 @@ const BookingModal = ({ isOpen, onClose, room, onBook }: BookingModalProps) => {
 
         <div className="space-y-4">
           <div className="flex gap-2">
-            <Badge className={room.console === 'PS5' ? 'bg-blue-600' : 'bg-purple-600'}>
-              {room.console}
+            <Badge className={room.console_type === 'PS5' ? 'bg-blue-600' : 'bg-purple-600'}>
+              {room.console_type}
+            </Badge>
+            <Badge className="bg-green-600">
+              Session starts: {new Date().toLocaleTimeString()}
             </Badge>
           </div>
 
@@ -190,7 +207,7 @@ const BookingModal = ({ isOpen, onClose, room, onBook }: BookingModalProps) => {
                   <Label htmlFor="single" className="text-white flex items-center gap-2 cursor-pointer">
                     <UserIcon className="w-4 h-4" />
                     Single Player
-                    <span className="text-green-400">({room.pricing.single} EGP/hr)</span>
+                    <span className="text-green-400">({room.pricing_single} EGP/hr)</span>
                   </Label>
                 </div>
                 <div className="flex items-center space-x-2">
@@ -198,7 +215,7 @@ const BookingModal = ({ isOpen, onClose, room, onBook }: BookingModalProps) => {
                   <Label htmlFor="multiplayer" className="text-white flex items-center gap-2 cursor-pointer">
                     <UsersIcon className="w-4 h-4" />
                     Multiplayer
-                    <span className="text-green-400">({room.pricing.multiplayer} EGP/hr)</span>
+                    <span className="text-green-400">({room.pricing_multiplayer} EGP/hr)</span>
                   </Label>
                 </div>
               </RadioGroup>
@@ -220,6 +237,20 @@ const BookingModal = ({ isOpen, onClose, room, onBook }: BookingModalProps) => {
                       {option.label}
                     </SelectItem>
                   ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <Label className="text-white">Payment Method</Label>
+              <Select value={paymentMethod} onValueChange={(value: 'cash' | 'card' | 'transfer') => setPaymentMethod(value)}>
+                <SelectTrigger className="bg-slate-700 border-slate-600 text-white">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="bg-slate-700 border-slate-600">
+                  <SelectItem value="cash" className="text-white">Cash</SelectItem>
+                  <SelectItem value="card" className="text-white">Card</SelectItem>
+                  <SelectItem value="transfer" className="text-white">Transfer</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -275,12 +306,12 @@ const BookingModal = ({ isOpen, onClose, room, onBook }: BookingModalProps) => {
                   <ClockIcon className="w-4 h-4" />
                   Room Cost:
                 </span>
-                <span>{calculateRoomCost()} EGP</span>
+                <span>{calculateRoomCost().toFixed(2)} EGP</span>
               </div>
               {calculateCafeCost() > 0 && (
                 <div className="flex items-center justify-between">
                   <span>Café Cost:</span>
-                  <span>{calculateCafeCost()} EGP</span>
+                  <span>{calculateCafeCost().toFixed(2)} EGP</span>
                 </div>
               )}
               <div className="flex items-center justify-between text-lg font-bold text-green-400 border-t border-slate-600 pt-2">
@@ -288,7 +319,7 @@ const BookingModal = ({ isOpen, onClose, room, onBook }: BookingModalProps) => {
                   <DollarSignIcon className="w-4 h-4" />
                   Total:
                 </span>
-                <span>{calculateTotalCost()} EGP</span>
+                <span>{calculateTotalCost().toFixed(2)} EGP</span>
               </div>
             </div>
 
@@ -297,7 +328,7 @@ const BookingModal = ({ isOpen, onClose, room, onBook }: BookingModalProps) => {
                 Cancel
               </Button>
               <Button type="submit" disabled={isLoading} className="flex-1 bg-green-600 hover:bg-green-700">
-                {isLoading ? 'Starting...' : 'Start Session'}
+                {isLoading ? 'Starting...' : `Start Session at ${new Date().toLocaleTimeString()}`}
               </Button>
             </div>
           </form>

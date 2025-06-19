@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { ShoppingCartIcon, PlusIcon, MinusIcon, TrashIcon } from 'lucide-react';
-import { processCafeCart } from '@/services/supabaseService';
+import { createOrder, createOrderItem, createTransaction } from '@/services/supabaseService';
 import { useToast } from '@/hooks/use-toast';
 
 interface CartItem {
@@ -87,11 +87,41 @@ const CafeCartProcessor = ({ cafeProducts, onOrderProcessed }: CafeCartProcessor
 
     setIsProcessing(true);
     try {
-      await processCafeCart(customerName.trim(), cart, paymentMethod);
+      const totalAmount = getTotalAmount();
       
+      // Create order
+      const order = await createOrder({
+        customer_name: customerName.trim(),
+        order_type: 'cafe_order',
+        total_amount: totalAmount,
+        status: 'active',
+        start_time: new Date().toISOString()
+      });
+
+      // Create order items
+      for (const item of cart) {
+        await createOrderItem({
+          order_id: order.id!,
+          item_type: 'cafe_product',
+          item_name: item.name,
+          quantity: item.quantity,
+          unit_price: item.price,
+          total_price: item.price * item.quantity
+        });
+      }
+
+      // Create transaction
+      await createTransaction({
+        order_id: order.id!,
+        transaction_type: 'payment',
+        amount: totalAmount,
+        payment_method: paymentMethod,
+        description: `Cafe order for ${customerName.trim()} - ${cart.length} items`
+      });
+
       toast({
         title: "Success",
-        description: "Order processed successfully!",
+        description: `Order processed successfully! Order ID: ${order.id}`,
       });
 
       // Reset form
@@ -248,7 +278,7 @@ const CafeCartProcessor = ({ cafeProducts, onOrderProcessed }: CafeCartProcessor
                   disabled={isProcessing || cart.length === 0 || !customerName.trim()}
                   className="w-full bg-green-600 hover:bg-green-700"
                 >
-                  {isProcessing ? 'Processing...' : 'Process Order'}
+                  {isProcessing ? 'Processing...' : `Process Order (${new Date().toLocaleTimeString()})`}
                 </Button>
               </div>
             )}
