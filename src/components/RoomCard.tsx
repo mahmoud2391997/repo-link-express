@@ -1,34 +1,35 @@
+
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { PlayIcon, StopCircleIcon, ClockIcon, UserIcon, GamepadIcon } from 'lucide-react';
-import { Room } from '@/data/roomsData';
+import { Room } from '@/services/supabaseService';
 import { showSessionEndNotification } from '@/utils/notificationUtils';
 
 interface RoomCardProps {
   room: Room;
-  onStartSession: (roomId: string) => void;
-  onStopSession: (roomId: string) => void;
+  onClick: () => void;
+  onEndSession: () => void;
 }
 
-const RoomCard = ({ room, onStartSession, onStopSession }: RoomCardProps) => {
+const RoomCard = ({ room, onClick, onEndSession }: RoomCardProps) => {
   const [timeRemaining, setTimeRemaining] = useState<string>('');
   const [hasNotified, setHasNotified] = useState(false);
 
   useEffect(() => {
-    if (room.status === 'occupied' && room.currentSession) {
+    if (room.status === 'occupied' && room.current_session_end) {
       const timer = setInterval(() => {
         const now = new Date();
-        const endTime = new Date(room.currentSession!.endTime);
+        const endTime = new Date(room.current_session_end!);
         const diff = endTime.getTime() - now.getTime();
         
         if (diff <= 0) {
           setTimeRemaining('EXPIRED');
           
           // Show notification only once when session expires
-          if (!hasNotified) {
-            showSessionEndNotification(room.name, room.currentSession!.customerName);
+          if (!hasNotified && room.current_customer_name) {
+            showSessionEndNotification(room.name, room.current_customer_name);
             setHasNotified(true);
           }
           return;
@@ -50,19 +51,20 @@ const RoomCard = ({ room, onStartSession, onStopSession }: RoomCardProps) => {
     } else {
       setHasNotified(false);
     }
-  }, [room.status, room.currentSession, hasNotified]);
+  }, [room.status, room.current_session_end, hasNotified, room.current_customer_name, room.name]);
 
   const getStatusColor = () => {
     switch (room.status) {
       case 'available': return 'bg-green-500';
       case 'occupied': return 'bg-red-500';
       case 'cleaning': return 'bg-yellow-500';
+      case 'maintenance': return 'bg-orange-500';
       default: return 'bg-gray-500';
     }
   };
 
   const getConsoleColor = () => {
-    return room.console === 'PS5' ? 'bg-blue-600' : 'bg-purple-600';
+    return room.console_type === 'PS5' ? 'bg-blue-600' : 'bg-green-600';
   };
 
   return (
@@ -77,11 +79,13 @@ const RoomCard = ({ room, onStartSession, onStopSession }: RoomCardProps) => {
         </div>
         <div className="flex gap-2">
           <Badge className={`${getConsoleColor()} text-white border-0`}>
-            {room.console}
+            {room.console_type}
           </Badge>
-          <Badge variant="outline" className="text-white border-slate-500">
-            {room.mode === 'single' ? 'Single' : 'Multi'}
-          </Badge>
+          {room.current_mode && (
+            <Badge variant="outline" className="text-white border-slate-500">
+              {room.current_mode === 'single' ? 'Single' : 'Multi'}
+            </Badge>
+          )}
         </div>
       </CardHeader>
       
@@ -89,19 +93,19 @@ const RoomCard = ({ room, onStartSession, onStopSession }: RoomCardProps) => {
         <div className="text-sm text-gray-300">
           <div className="flex justify-between">
             <span>Single:</span>
-            <span className="text-green-400">{room.pricing.single} EGP/hr</span>
+            <span className="text-green-400">{room.pricing_single} EGP/hr</span>
           </div>
           <div className="flex justify-between">
             <span>Multi:</span>
-            <span className="text-green-400">{room.pricing.multiplayer} EGP/hr</span>
+            <span className="text-green-400">{room.pricing_multiplayer} EGP/hr</span>
           </div>
         </div>
 
-        {room.status === 'occupied' && room.currentSession && (
+        {room.status === 'occupied' && room.current_customer_name && (
           <div className={`bg-slate-700 p-3 rounded-lg space-y-2 ${timeRemaining === 'EXPIRED' ? 'border-2 border-red-500 animate-pulse' : ''}`}>
             <div className="flex items-center gap-2 text-white">
               <UserIcon className="w-4 h-4" />
-              <span className="text-sm">{room.currentSession.customerName}</span>
+              <span className="text-sm">{room.current_customer_name}</span>
             </div>
             <div className="flex items-center gap-2 text-white">
               <ClockIcon className="w-4 h-4" />
@@ -110,7 +114,7 @@ const RoomCard = ({ room, onStartSession, onStopSession }: RoomCardProps) => {
               </span>
             </div>
             <div className="text-sm text-green-400">
-              Total: {room.currentSession.totalCost} EGP
+              Total: {room.current_total_cost || 0} EGP
             </div>
           </div>
         )}
@@ -118,7 +122,7 @@ const RoomCard = ({ room, onStartSession, onStopSession }: RoomCardProps) => {
         <div className="flex gap-2">
           {room.status === 'available' && (
             <Button 
-              onClick={() => onStartSession(room.id)}
+              onClick={onClick}
               className="flex-1 bg-green-600 hover:bg-green-700"
             >
               <PlayIcon className="w-4 h-4 mr-2" />
@@ -128,7 +132,7 @@ const RoomCard = ({ room, onStartSession, onStopSession }: RoomCardProps) => {
           
           {room.status === 'occupied' && (
             <Button 
-              onClick={() => onStopSession(room.id)}
+              onClick={onEndSession}
               variant="destructive"
               className="flex-1"
             >
@@ -140,6 +144,12 @@ const RoomCard = ({ room, onStartSession, onStopSession }: RoomCardProps) => {
           {room.status === 'cleaning' && (
             <Button disabled className="flex-1 bg-yellow-600">
               Cleaning...
+            </Button>
+          )}
+
+          {room.status === 'maintenance' && (
+            <Button disabled className="flex-1 bg-orange-600">
+              Maintenance
             </Button>
           )}
         </div>
