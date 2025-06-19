@@ -1,17 +1,13 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { GamepadIcon, ShoppingCartIcon, CalendarIcon, SettingsIcon, DollarSignIcon, ClipboardListIcon, UsersIcon } from 'lucide-react';
+import { GamepadIcon, ShoppingCartIcon, CalendarIcon, DollarSignIcon, ClipboardListIcon } from 'lucide-react';
 import RoomsGrid from '@/components/RoomsGrid';
-import RoomsManagement from '@/components/RoomsManagement';
 import AppointmentsManagement from '@/components/AppointmentsManagement';
 import CafeManagement from '@/components/CafeManagement';
-import OrdersManagement from '@/components/OrdersManagement';
 import CurrentOrders from '@/components/CurrentOrders';
-import TransactionsManagement from '@/components/TransactionsManagement';
-import UserManagement from '@/components/UserManagement';
 
-const AdminDashboard = () => {
+const CashierDashboard = () => {
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -61,7 +57,7 @@ const AdminDashboard = () => {
       </div>
 
       <Tabs defaultValue="rooms" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-7 bg-slate-800 border-0">
+        <TabsList className="grid w-full grid-cols-4 bg-slate-800 border-0">
           <TabsTrigger value="rooms" className="data-[state=active]:bg-blue-600 text-white">
             <GamepadIcon className="w-4 h-4 mr-2" />
             Rooms
@@ -77,18 +73,6 @@ const AdminDashboard = () => {
           <TabsTrigger value="cafe" className="data-[state=active]:bg-orange-600 text-white">
             <ShoppingCartIcon className="w-4 h-4 mr-2" />
             Café
-          </TabsTrigger>
-          <TabsTrigger value="orders" className="data-[state=active]:bg-indigo-600 text-white">
-            <ClipboardListIcon className="w-4 h-4 mr-2" />
-            Orders
-          </TabsTrigger>
-          <TabsTrigger value="users" className="data-[state=active]:bg-pink-600 text-white">
-            <UsersIcon className="w-4 h-4 mr-2" />
-            Users
-          </TabsTrigger>
-          <TabsTrigger value="management" className="data-[state=active]:bg-gray-600 text-white">
-            <SettingsIcon className="w-4 h-4 mr-2" />
-            Management
           </TabsTrigger>
         </TabsList>
 
@@ -114,24 +98,9 @@ const AdminDashboard = () => {
         <TabsContent value="cafe">
           <CafeManagement />
         </TabsContent>
-
-        <TabsContent value="orders">
-          <OrdersManagement />
-        </TabsContent>
-
-        <TabsContent value="users">
-          <UserManagement />
-        </TabsContent>
-
-        <TabsContent value="management">
-          <div className="space-y-6">
-            <RoomsManagement />
-            <TransactionsManagement />
-          </div>
-        </TabsContent>
       </Tabs>
     </div>
   );
 };
 
-export default AdminDashboard;
+export default CashierDashboard;

@@ -14,36 +14,81 @@ import AuthPage from "./components/AuthPage";
 
 const queryClient = new QueryClient();
 
+interface UserProfile {
+  id: string;
+  email: string;
+  role: string;
+}
+
 const App = () => {
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<User | null>(null);
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Set up auth state listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, session) => {
+      async (event, session) => {
         setSession(session);
         setUser(session?.user ?? null);
+        
+        if (session?.user) {
+          try {
+            const { data: profile } = await supabase
+              .from('profiles')
+              .select('*')
+              .eq('id', session.user.id)
+              .single();
+            
+            setUserProfile(profile);
+          } catch (error) {
+            console.error('Error fetching user profile:', error);
+          }
+        } else {
+          setUserProfile(null);
+        }
+        
         setLoading(false);
       }
     );
 
-    // Check for existing session
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       setUser(session?.user ?? null);
-      setLoading(false);
+      
+      if (session?.user) {
+        supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', session.user.id)
+          .single()
+          .then(({ data: profile }) => {
+            setUserProfile(profile);
+            setLoading(false);
+          });
+      } else {
+        setLoading(false);
+      }
     });
 
     return () => subscription.unsubscribe();
   }, []);
 
   const handleAuthSuccess = () => {
-    // Refresh the session after successful auth
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       setUser(session?.user ?? null);
+      
+      if (session?.user) {
+        supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', session.user.id)
+          .single()
+          .then(({ data: profile }) => {
+            setUserProfile(profile);
+          });
+      }
     });
   };
 
@@ -52,6 +97,7 @@ const App = () => {
       await supabase.auth.signOut();
       setSession(null);
       setUser(null);
+      setUserProfile(null);
     } catch (error) {
       console.error('Error signing out:', error);
     }
@@ -65,7 +111,7 @@ const App = () => {
     );
   }
 
-  if (!session || !user) {
+  if (!session || !user || !userProfile) {
     return (
       <QueryClientProvider client={queryClient}>
         <TooltipProvider>
@@ -85,7 +131,7 @@ const App = () => {
           <Sonner />
           <BrowserRouter>
             <Routes>
-              <Route path="/" element={<Index user={user} onSignOut={handleSignOut} />} />
+              <Route path="/" element={<Index user={user} userProfile={userProfile} onSignOut={handleSignOut} />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </BrowserRouter>
