@@ -1,11 +1,12 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { GamepadIcon, ShoppingCartIcon, CalendarIcon, DollarSignIcon, ClipboardListIcon } from 'lucide-react';
+import { GamepadIcon, ShoppingCartIcon, CalendarIcon, DollarSignIcon, ClipboardListIcon, CreditCardIcon } from 'lucide-react';
 import RoomsGrid from '@/components/RoomsGrid';
 import AppointmentsManagement from '@/components/AppointmentsManagement';
 import CafeManagement from '@/components/CafeManagement';
 import CurrentOrders from '@/components/CurrentOrders';
+import TransactionsManagement from '@/components/TransactionsManagement';
 
 const CashierDashboard = () => {
   return (
@@ -57,7 +58,7 @@ const CashierDashboard = () => {
       </div>
 
       <Tabs defaultValue="rooms" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-4 bg-slate-800 border-0">
+        <TabsList className="grid w-full grid-cols-5 bg-slate-800 border-0">
           <TabsTrigger value="rooms" className="data-[state=active]:bg-blue-600 text-white">
             <GamepadIcon className="w-4 h-4 mr-2" />
             Rooms
@@ -73,6 +74,10 @@ const CashierDashboard = () => {
           <TabsTrigger value="cafe" className="data-[state=active]:bg-orange-600 text-white">
             <ShoppingCartIcon className="w-4 h-4 mr-2" />
             Café
+          </TabsTrigger>
+          <TabsTrigger value="transactions" className="data-[state=active]:bg-teal-600 text-white">
+            <CreditCardIcon className="w-4 h-4 mr-2" />
+            Transactions
           </TabsTrigger>
         </TabsList>
 
@@ -97,6 +102,10 @@ const CashierDashboard = () => {
 
         <TabsContent value="cafe">
           <CafeManagement />
+        </TabsContent>
+
+        <TabsContent value="transactions">
+          <TransactionsManagement />
         </TabsContent>
       </Tabs>
     </div>

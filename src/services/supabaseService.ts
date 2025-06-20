@@ -244,7 +244,7 @@ export const deleteCafeProduct = async (id: string) => {
 };
 
 // Reports
-export const getReportData = async (period: 'daily' | 'weekly' | 'monthly') => {
+export const getReportData = async (period: 'daily' | 'weekly' | 'monthly' | 'quarterly' | 'half-yearly' | 'yearly') => {
   const now = new Date();
   let startDate: string;
   
@@ -258,6 +258,17 @@ export const getReportData = async (period: 'daily' | 'weekly' | 'monthly') => {
       break;
     case 'monthly':
       startDate = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+      break;
+    case 'quarterly':
+      const quarterStart = new Date(now.getFullYear(), now.getMonth() - 3, 1);
+      startDate = quarterStart.toISOString();
+      break;
+    case 'half-yearly':
+      const halfYearStart = new Date(now.getFullYear(), now.getMonth() - 6, 1);
+      startDate = halfYearStart.toISOString();
+      break;
+    case 'yearly':
+      startDate = new Date(now.getFullYear(), 0, 1).toISOString();
       break;
   }
   

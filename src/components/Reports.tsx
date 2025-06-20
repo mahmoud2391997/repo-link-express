@@ -7,7 +7,7 @@ import { BarChart3Icon, DollarSignIcon, TrendingUpIcon, UsersIcon } from 'lucide
 import { getReportData } from '@/services/supabaseService';
 
 const Reports = () => {
-  const [period, setPeriod] = useState<'daily' | 'weekly' | 'monthly'>('daily');
+  const [period, setPeriod] = useState<'daily' | 'weekly' | 'monthly' | 'quarterly' | 'half-yearly' | 'yearly'>('daily');
   const [reportData, setReportData] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [stats, setStats] = useState({
@@ -50,6 +50,9 @@ const Reports = () => {
       case 'daily': return 'Today';
       case 'weekly': return 'This Week';
       case 'monthly': return 'This Month';
+      case 'quarterly': return 'Last 3 Months';
+      case 'half-yearly': return 'Last 6 Months';
+      case 'yearly': return 'This Year';
     }
   };
 
@@ -58,14 +61,17 @@ const Reports = () => {
       <div className="flex items-center justify-between">
         <h2 className="text-2xl font-bold text-white">Reports & Analytics</h2>
         <div className="flex gap-4">
-          <Select value={period} onValueChange={(value: 'daily' | 'weekly' | 'monthly') => setPeriod(value)}>
-            <SelectTrigger className="w-40 bg-slate-700 border-slate-600 text-white">
+          <Select value={period} onValueChange={(value: 'daily' | 'weekly' | 'monthly' | 'quarterly' | 'half-yearly' | 'yearly') => setPeriod(value)}>
+            <SelectTrigger className="w-48 bg-slate-700 border-slate-600 text-white">
               <SelectValue />
             </SelectTrigger>
             <SelectContent className="bg-slate-700 border-slate-600">
               <SelectItem value="daily" className="text-white hover:bg-slate-600">Daily</SelectItem>
               <SelectItem value="weekly" className="text-white hover:bg-slate-600">Weekly</SelectItem>
               <SelectItem value="monthly" className="text-white hover:bg-slate-600">Monthly</SelectItem>
+              <SelectItem value="quarterly" className="text-white hover:bg-slate-600">3 Months</SelectItem>
+              <SelectItem value="half-yearly" className="text-white hover:bg-slate-600">6 Months</SelectItem>
+              <SelectItem value="yearly" className="text-white hover:bg-slate-600">Yearly</SelectItem>
             </SelectContent>
           </Select>
           <Button onClick={loadReportData} disabled={isLoading} className="bg-blue-600 hover:bg-blue-700">

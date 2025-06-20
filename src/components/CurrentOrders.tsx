@@ -13,7 +13,7 @@ import { fetchOrders, editOrder, addOrder } from '@/store/slices/ordersSlice';
 import { fetchRooms, editRoom } from '@/store/slices/roomsSlice';
 import { fetchCafeProducts } from '@/store/slices/cafeProductsSlice';
 import { RootState, AppDispatch } from '@/store/store';
-import { createOrderItem, createTransaction, updateRoom } from '@/services/supabaseService';
+import { createOrderItem, createTransaction } from '@/services/supabaseService';
 import { useToast } from '@/hooks/use-toast';
 import CafeCartProcessor from '@/components/CafeCartProcessor';
 
@@ -41,7 +41,17 @@ const CurrentOrders = () => {
     dispatch(fetchCafeProducts());
   }, [dispatch]);
 
-  const activeOrders = orders.filter(order => order.status === 'active');
+  // Auto-refresh orders every 30 seconds to sync with room statuses
+  useEffect(() => {
+    const interval = setInterval(() => {
+      dispatch(fetchOrders('active'));
+      dispatch(fetchRooms());
+    }, 30000);
+
+    return () => clearInterval(interval);
+  }, [dispatch]);
+
+  const activeOrders = orders.filter((order: any) => order.status === 'active');
 
   const startRoomSession = async (order: any) => {
     try {
@@ -84,12 +94,14 @@ const CurrentOrders = () => {
       toast({
         title: "Session Started",
         description: `Room ${room.name} session started for ${order.customer_name}`,
+        duration: 5000,
       });
     } catch (error) {
       toast({
         title: "Error",
         description: "Failed to start room session",
         variant: "destructive",
+        duration: 5000,
       });
     }
   };
@@ -104,7 +116,7 @@ const CurrentOrders = () => {
       const durationHours = (new Date().getTime() - startTime.getTime()) / (1000 * 60 * 60);
       
       const pricing = (order.mode || roomOrderForm.mode) === 'single' ? room.pricing_single : room.pricing_multiplayer;
-      const roomCost = durationHours * pricing;
+      const roomCost = order.is_open_time ? durationHours * pricing : order.total_amount;
       
       // Calculate total cost including existing cafe items
       const cafeItemsCost = order.order_items?.reduce((sum: number, item: any) => {
@@ -151,12 +163,14 @@ const CurrentOrders = () => {
       toast({
         title: "Session Completed",
         description: `Room ${room.name} session ended. Total: ${totalCost.toFixed(2)} EGP`,
+        duration: 0, // Persistent toast that only closes when clicked
       });
     } catch (error) {
       toast({
         title: "Error",
         description: "Failed to stop room session",
         variant: "destructive",
+        duration: 5000,
       });
     }
   };
@@ -167,6 +181,7 @@ const CurrentOrders = () => {
         title: "Error",
         description: "Please fill all required fields",
         variant: "destructive",
+        duration: 5000,
       });
       return;
     }
@@ -189,11 +204,12 @@ const CurrentOrders = () => {
         duration_hours: roomOrderForm.is_open_time ? null : roomOrderForm.duration_hours
       };
 
-      const newOrder = await dispatch(addOrder(orderData));
+      const newOrderResult = await dispatch(addOrder(orderData));
+      const newOrder = newOrderResult.payload as any;
 
       // Create order item
       await createOrderItem({
-        order_id: newOrder.payload.id,
+        order_id: newOrder.id,
         item_type: 'room_time',
         item_name: `${room.name} - ${roomOrderForm.mode}${roomOrderForm.is_open_time ? ' (Open Time)' : ` (${roomOrderForm.duration_hours}h)`}`,
         quantity: roomOrderForm.is_open_time ? 0 : roomOrderForm.duration_hours,
@@ -213,12 +229,14 @@ const CurrentOrders = () => {
       toast({
         title: "Success",
         description: "Room order created successfully",
+        duration: 5000,
       });
     } catch (error) {
       toast({
         title: "Error",
         description: "Failed to create room order",
         variant: "destructive",
+        duration: 5000,
       });
     }
   };
@@ -232,6 +250,20 @@ const CurrentOrders = () => {
     const hours = Math.floor(totalMinutes / 60);
     const minutes = totalMinutes % 60;
     return `${hours}:${minutes.toString().padStart(2, '0')}`;
+  };
+
+  const getRemainingTime = (endTime: string) => {
+    if (!endTime) return null;
+    const end = new Date(endTime);
+    const now = new Date();
+    const diffMs = end.getTime() - now.getTime();
+    
+    if (diffMs <= 0) return 'Time Up!';
+    
+    const totalMinutes = Math.floor(diffMs / (1000 * 60));
+    const hours = Math.floor(totalMinutes / 60);
+    const minutes = totalMinutes % 60;
+    return `${hours}:${minutes.toString().padStart(2, '0')} left`;
   };
 
   const getOrderTypeColor = (orderType: string) => {
@@ -351,7 +383,7 @@ const CurrentOrders = () => {
         </Card>
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
-          {activeOrders.map((order) => {
+          {activeOrders.map((order: any) => {
             const room = rooms.find(r => r.id === order.room_id);
             const isRoomOrder = order.order_type === 'room_reservation' || order.order_type === 'combo';
             const isSessionActive = room && room.status === 'occupied' && room.current_customer_name === order.customer_name;
@@ -384,7 +416,12 @@ const CurrentOrders = () => {
                       </div>
                       {isSessionActive && order.start_time && (
                         <div className="text-blue-400 text-sm">
-                          {getSessionDuration(order.start_time)}
+                          Elapsed: {getSessionDuration(order.start_time)}
+                        </div>
+                      )}
+                      {!order.is_open_time && order.end_time && isSessionActive && (
+                        <div className="text-yellow-400 text-sm">
+                          {getRemainingTime(order.end_time)}
                         </div>
                       )}
                     </div>
