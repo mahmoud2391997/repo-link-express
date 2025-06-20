@@ -27,76 +27,92 @@ const AuthPage = ({ onAuthSuccess }: AuthPageProps) => {
       }
     };
     checkAuth();
+
+    // Load saved credentials from sessionStorage
+    const savedCredentials = sessionStorage.getItem('gaming_center_credentials');
+    if (savedCredentials) {
+      try {
+        const { email, role } = JSON.parse(savedCredentials);
+        setLoginForm(prev => ({ ...prev, email, role }));
+      } catch (error) {
+        console.error('Error loading saved credentials:', error);
+      }
+    }
   }, [onAuthSuccess]);
 
-const handleLogin = async (e: React.FormEvent) => {
-  e.preventDefault();
-  setIsLoading(true);
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsLoading(true);
 
-  try {
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email: loginForm.email,
-      password: loginForm.password,
-    });
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: loginForm.email,
+        password: loginForm.password,
+      });
 
-    if (error) throw error;
+      if (error) throw error;
 
-    const userId = data.user?.id;
-console.log(userId);
+      const userId = data.user?.id;
+      console.log(userId);
 
-    // 🔍 Try to fetch the profile
-    const { data: profile, error: profileError } = await supabase
-      .from('profiles')
-      .select('role')
-      .eq('id', userId)
-      .single();
-console.log(data);
-
-    // 🚨 If profile missing or not found (status code 406 or 404)
-    if (profileError && (profileError.code === 'PGRST116' || profileError.code === 'PGRST107')) {
-      // Optional: Auto-create profile if missing
-      const { error: insertError } = await supabase
+      // 🔍 Try to fetch the profile
+      const { data: profile, error: profileError } = await supabase
         .from('profiles')
-        .insert({
-          id: userId,
-          email: loginForm.email,
-          role: loginForm.role,
-        });
+        .select('role')
+        .eq('id', userId)
+        .single();
+      console.log(data);
 
-      if (insertError) throw new Error("Failed to create user profile");
+      // 🚨 If profile missing or not found (status code 406 or 404)
+      if (profileError && (profileError.code === 'PGRST116' || profileError.code === 'PGRST107')) {
+        // Optional: Auto-create profile if missing
+        const { error: insertError } = await supabase
+          .from('profiles')
+          .insert({
+            id: userId,
+            email: loginForm.email,
+            role: loginForm.role,
+          });
+
+        if (insertError) throw new Error("Failed to create user profile");
+      }
+
+      // 🔁 Re-fetch after insert or use existing one
+      const { data: finalProfile, error: finalError } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', userId)
+        .single();
+
+      if (finalError) throw new Error('Failed to fetch final profile');
+
+      if (finalProfile.role !== loginForm.role) {
+        await supabase.auth.signOut();
+        throw new Error(`Access denied. You don't have ${loginForm.role} privileges.`);
+      }
+
+      // Save credentials to sessionStorage (without password)
+      sessionStorage.setItem('gaming_center_credentials', JSON.stringify({
+        email: loginForm.email,
+        role: loginForm.role
+      }));
+
+      toast({
+        title: "Success",
+        description: `Logged in as ${finalProfile.role}`,
+      });
+
+      onAuthSuccess();
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Login failed",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
     }
-
-    // 🔁 Re-fetch after insert or use existing one
-    const { data: finalProfile, error: finalError } = await supabase
-      .from('profiles')
-      .select('role')
-      .eq('id', userId)
-      .single();
-
-    if (finalError) throw new Error('Failed to fetch final profile');
-
-    if (finalProfile.role !== loginForm.role) {
-      await supabase.auth.signOut();
-      throw new Error(`Access denied. You don't have ${loginForm.role} privileges.`);
-    }
-
-    toast({
-      title: "Success",
-      description: `Logged in as ${finalProfile.role}`,
-    });
-
-    onAuthSuccess();
-  } catch (error: any) {
-    toast({
-      title: "Error",
-      description: error.message || "Login failed",
-      variant: "destructive",
-    });
-  } finally {
-    setIsLoading(false);
-  }
-};
-
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-slate-900 to-black flex items-center justify-center p-4">

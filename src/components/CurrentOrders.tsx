@@ -51,9 +51,10 @@ const CurrentOrders = () => {
       const startTime = new Date().toISOString();
       let endTime = null;
       
-      if (!roomOrderForm.is_open_time) {
+      // Only set end time if it's not open time
+      if (!order.is_open_time && order.duration_hours) {
         const end = new Date();
-        end.setHours(end.getHours() + roomOrderForm.duration_hours);
+        end.setHours(end.getHours() + order.duration_hours);
         endTime = end.toISOString();
       }
 
@@ -65,7 +66,7 @@ const CurrentOrders = () => {
           current_customer_name: order.customer_name,
           current_session_start: startTime,
           current_session_end: endTime,
-          current_mode: roomOrderForm.mode,
+          current_mode: order.mode || roomOrderForm.mode,
           current_total_cost: order.total_amount
         }
       }));
@@ -102,8 +103,18 @@ const CurrentOrders = () => {
       const startTime = new Date(order.start_time);
       const durationHours = (new Date().getTime() - startTime.getTime()) / (1000 * 60 * 60);
       
-      const pricing = roomOrderForm.mode === 'single' ? room.pricing_single : room.pricing_multiplayer;
-      const totalCost = durationHours * pricing;
+      const pricing = (order.mode || roomOrderForm.mode) === 'single' ? room.pricing_single : room.pricing_multiplayer;
+      const roomCost = durationHours * pricing;
+      
+      // Calculate total cost including existing cafe items
+      const cafeItemsCost = order.order_items?.reduce((sum: number, item: any) => {
+        if (item.item_type === 'cafe_product') {
+          return sum + item.total_price;
+        }
+        return sum;
+      }, 0) || 0;
+      
+      const totalCost = roomCost + cafeItemsCost;
 
       // Update room status
       await dispatch(editRoom({
@@ -128,7 +139,7 @@ const CurrentOrders = () => {
         }
       }));
 
-      // Create transaction
+      // Create transaction for the final amount
       await createTransaction({
         order_id: order.id,
         transaction_type: 'payment',
@@ -167,19 +178,24 @@ const CurrentOrders = () => {
       const pricing = roomOrderForm.mode === 'single' ? room.pricing_single : room.pricing_multiplayer;
       const estimatedCost = roomOrderForm.is_open_time ? 0 : roomOrderForm.duration_hours * pricing;
 
-      await dispatch(addOrder({
+      const orderData = {
         customer_name: roomOrderForm.customer_name,
-        order_type: 'room_reservation',
+        order_type: 'room_reservation' as const,
         room_id: roomOrderForm.room_id,
         total_amount: estimatedCost,
-        status: 'active'
-      }));
+        status: 'active' as const,
+        mode: roomOrderForm.mode,
+        is_open_time: roomOrderForm.is_open_time,
+        duration_hours: roomOrderForm.is_open_time ? null : roomOrderForm.duration_hours
+      };
+
+      const newOrder = await dispatch(addOrder(orderData));
 
       // Create order item
       await createOrderItem({
-        order_id: '', // Will be filled by the created order
+        order_id: newOrder.payload.id,
         item_type: 'room_time',
-        item_name: `${room.name} - ${roomOrderForm.mode}`,
+        item_name: `${room.name} - ${roomOrderForm.mode}${roomOrderForm.is_open_time ? ' (Open Time)' : ` (${roomOrderForm.duration_hours}h)`}`,
         quantity: roomOrderForm.is_open_time ? 0 : roomOrderForm.duration_hours,
         unit_price: pricing,
         total_price: estimatedCost
@@ -212,8 +228,9 @@ const CurrentOrders = () => {
     const start = new Date(startTime);
     const now = new Date();
     const diffMs = now.getTime() - start.getTime();
-    const hours = Math.floor(diffMs / (1000 * 60 * 60));
-    const minutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+    const totalMinutes = Math.floor(diffMs / (1000 * 60));
+    const hours = Math.floor(totalMinutes / 60);
+    const minutes = totalMinutes % 60;
     return `${hours}:${minutes.toString().padStart(2, '0')}`;
   };
 
@@ -298,7 +315,7 @@ const CurrentOrders = () => {
                     onChange={(e) => setRoomOrderForm({...roomOrderForm, is_open_time: e.target.checked})}
                     className="rounded"
                   />
-                  <Label htmlFor="openTime">Open Time (No specific end time)</Label>
+                  <Label htmlFor="openTime">Open Time (Pay when session ends)</Label>
                 </div>
 
                 {!roomOrderForm.is_open_time && (
@@ -354,11 +371,16 @@ const CurrentOrders = () => {
                             {room.name} - {room.console_type}
                           </Badge>
                         )}
+                        {order.is_open_time && (
+                          <Badge className="bg-yellow-600 text-white">
+                            OPEN TIME
+                          </Badge>
+                        )}
                       </div>
                     </div>
                     <div className="text-right">
                       <div className="text-green-400 font-bold">
-                        {order.total_amount.toFixed(2)} EGP
+                        {order.is_open_time && isSessionActive ? 'Pay on Stop' : `${order.total_amount.toFixed(2)} EGP`}
                       </div>
                       {isSessionActive && order.start_time && (
                         <div className="text-blue-400 text-sm">
@@ -375,7 +397,7 @@ const CurrentOrders = () => {
                     {order.order_items?.map((item: any, index: number) => (
                       <div key={index} className="flex justify-between text-sm">
                         <span className="text-gray-300">
-                          {item.quantity}x {item.item_name}
+                          {item.quantity > 0 ? `${item.quantity}x ` : ''}{item.item_name}
                         </span>
                         <span className="text-white">{item.total_price.toFixed(2)} EGP</span>
                       </div>
