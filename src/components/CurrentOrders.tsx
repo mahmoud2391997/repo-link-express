@@ -1,176 +1,331 @@
-
-import { useState, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+// src/components/CafeCartProcessor.tsx
+import { useState } from 'react';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { ClockIcon, UserIcon, DollarSignIcon, CheckCircleIcon, XCircleIcon } from 'lucide-react';
-import { getOrders, updateOrder, createTransaction } from '@/services/supabaseService';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { ShoppingCartIcon, PlusIcon, MinusIcon, TrashIcon } from 'lucide-react';
+import { createOrderItem, updateOrder } from '@/services/supabaseService';
 import { useToast } from '@/hooks/use-toast';
 
-const CurrentOrders = () => {
-  const [orders, setOrders] = useState<any[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
+interface CartItem {
+  id: string;
+  name: string;
+  price: number;
+  quantity: number;
+}
+
+interface CafeCartProcessorProps {
+  cafeProducts: Product[];
+  onOrderProcessed?: () => void;
+  existingOrderId?: string;
+}
+
+const CafeCartProcessor = ({ cafeProducts, onOrderProcessed, existingOrderId }: CafeCartProcessorProps) => {
+  const [isOpen, setIsOpen] = useState(!existingOrderId);
+  const [cart, setCart] = useState<CartItem[]>([]);
+  const [customerName, setCustomerName] = useState('');
+  const [paymentMethod, setPaymentMethod] = useState<'cash' | 'card' | 'transfer'>('cash');
+  const [isProcessing, setIsProcessing] = useState(false);
   const { toast } = useToast();
 
-  const loadOrders = async () => {
-    setIsLoading(true);
-    try {
-      const data = await getOrders('active');
-      setOrders(data);
-    } catch (error) {
-      console.error('Error loading orders:', error);
-    } finally {
-      setIsLoading(false);
+  const addToCart = (product: Product) => {
+    const existingItem = cart.find(item => item.id === product.id);
+    if (existingItem) {
+      setCart(cart.map(item => 
+        item.id === product.id 
+          ? { ...item, quantity: item.quantity + 1 }
+          : item
+      ));
+    } else {
+      setCart([...cart, {
+        id: product.id,
+        name: product.name,
+        price: product.price,
+        quantity: 1
+      }]);
     }
   };
 
-  useEffect(() => {
-    loadOrders();
-  }, []);
+  const updateQuantity = (id: string, quantity: number) => {
+    if (quantity <= 0) {
+      setCart(cart.filter(item => item.id !== id));
+    } else {
+      setCart(cart.map(item => 
+        item.id === id ? { ...item, quantity } : item
+      ));
+    }
+  };
 
-  const handleCompleteOrder = async (orderId: string, totalAmount: number) => {
-    try {
-      await updateOrder(orderId, { status: 'completed', end_time: new Date().toISOString() });
-      await createTransaction({
-        order_id: orderId,
-        transaction_type: 'payment',
-        amount: totalAmount,
-        payment_method: 'cash',
-        description: 'Order completion payment'
-      });
+  const removeFromCart = (id: string) => {
+    setCart(cart.filter(item => item.id !== id));
+  };
 
+  const getTotalAmount = () => {
+    return cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+  };
+
+  const processOrder = async () => {
+    if (!existingOrderId && !customerName.trim()) {
       toast({
-        title: "Order Completed",
-        description: "Order has been completed and payment recorded",
+        title: "Error",
+        description: "Please enter customer name",
+        variant: "destructive",
       });
+      return;
+    }
+
+    if (cart.length === 0) {
+      toast({
+        title: "Error",
+        description: "Cart is empty",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsProcessing(true);
+    try {
+      const totalAmount = getTotalAmount();
       
-      loadOrders();
+      if (existingOrderId) {
+        // Add items to existing order
+        for (const item of cart) {
+          await createOrderItem({
+            order_id: existingOrderId,
+            item_type: 'cafe_product',
+            item_name: item.name,
+            quantity: item.quantity,
+            unit_price: item.price,
+            total_price: item.price * item.quantity
+          });
+        }
+
+        // Update order total
+        const response = await updateOrder({
+          id: existingOrderId,
+          updates: { 
+            total_amount: totalAmount,
+            status: 'active'
+          }
+        });
+
+        const updatedOrder = (response as { payload: Order }).payload;
+
+        toast({
+          title: "Success",
+          description: "Items added to order successfully!",
+        });
+      } else  {
+        // Create new order
+        const order = await addOrder({
+          customer_name: customerName.trim(),
+          order_type: 'cafe_order',
+          total_amount: totalAmount,
+          status: 'active',
+          start_time: new Date().toISOString()
+        });
+
+        for (const item of cart) {
+          await createOrderItem({
+            order_id: order.id,
+            item_type: 'cafe_product',
+            item_name: item.name,
+            quantity: item.quantity,
+            unit_price: item.price,
+            total_price: item.price * item.quantity
+          });
+        }
+
+        await createTransaction({
+          order_id: order.id,
+          transaction_type: 'payment',
+          amount: totalAmount,
+          payment_method: paymentMethod,
+          description: `Cafe order for ${customerName.trim()} - ${cart.length} items`
+        });
+
+        toast({
+          title: "Success",
+          description: `Order processed successfully! Order ID: ${order.id}`,
+        });
+      }
+
+
+      setCart([]);
+      setCustomerName('');
+      setPaymentMethod('cash');
+      setIsOpen(false);
+      
+      if (onOrderProcessed) {
+        onOrderProcessed();
+      }
     } catch (error) {
-      console.error('Error completing order:', error);
+      console.error('Error processing order:', error);
       toast({
         title: "Error",
-        description: "Failed to complete order",
+        description: "Failed to process order",
         variant: "destructive",
       });
-    }
-  };
-
-  const handleCancelOrder = async (orderId: string) => {
-    try {
-      await updateOrder(orderId, { status: 'cancelled' });
-      toast({
-        title: "Order Cancelled",
-        description: "Order has been cancelled",
-      });
-      loadOrders();
-    } catch (error) {
-      console.error('Error cancelling order:', error);
-      toast({
-        title: "Error",
-        description: "Failed to cancel order",
-        variant: "destructive",
-      });
-    }
-  };
-
-  const getOrderTypeColor = (orderType: string) => {
-    switch (orderType) {
-      case 'room_reservation': return 'bg-blue-600';
-      case 'cafe_order': return 'bg-orange-600';
-      case 'combo': return 'bg-purple-600';
-      default: return 'bg-gray-600';
+    } finally {
+      setIsProcessing(false);
     }
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold text-white">Current Orders</h2>
-        <Button onClick={loadOrders} disabled={isLoading} className="bg-blue-600 hover:bg-blue-700">
-          {isLoading ? 'Loading...' : 'Refresh'}
-        </Button>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {orders.map((order) => (
-          <Card key={order.id} className="bg-slate-800 border-slate-700">
-            <CardHeader className="pb-3">
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-white flex items-center gap-2">
-                  <UserIcon className="w-5 h-5" />
-                  {order.customer_name}
-                </CardTitle>
-                <Badge className={`${getOrderTypeColor(order.order_type)} text-white border-0`}>
-                  {order.order_type.replace('_', ' ').toUpperCase()}
-                </Badge>
-              </div>
-            </CardHeader>
-            
-            <CardContent className="space-y-4">
-              {order.room_id && (
-                <div className="text-sm text-gray-300">
-                  <strong>Room:</strong> {order.room_id}
-                </div>
-              )}
-              
-              <div className="text-sm text-gray-300">
-                <div className="flex items-center gap-2">
-                  <ClockIcon className="w-4 h-4" />
-                  <span>Started: {new Date(order.start_time || order.created_at).toLocaleString()}</span>
-                </div>
-              </div>
-
-              {order.order_items && order.order_items.length > 0 && (
-                <div className="space-y-2">
-                  <strong className="text-white">Items:</strong>
-                  {order.order_items.map((item: any) => (
-                    <div key={item.id} className="text-sm text-gray-300 flex justify-between">
-                      <span>{item.item_name} x{item.quantity}</span>
-                      <span>{item.total_price} EGP</span>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              <div className="flex items-center justify-between text-lg font-bold text-green-400 border-t border-slate-600 pt-3">
-                <span className="flex items-center gap-2">
-                  <DollarSignIcon className="w-4 h-4" />
-                  Total:
-                </span>
-                <span>{order.total_amount} EGP</span>
-              </div>
-
-              <div className="flex gap-2">
-                <Button 
-                  onClick={() => handleCompleteOrder(order.id, order.total_amount)}
-                  className="flex-1 bg-green-600 hover:bg-green-700"
-                >
-                  <CheckCircleIcon className="w-4 h-4 mr-2" />
-                  Complete
-                </Button>
-                <Button 
-                  onClick={() => handleCancelOrder(order.id)}
-                  variant="destructive"
-                  className="flex-1"
-                >
-                  <XCircleIcon className="w-4 h-4 mr-2" />
-                  Cancel
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
+    <Dialog open={isOpen} onOpenChange={setIsOpen}>
+      {!existingOrderId && (
+        <DialogTrigger asChild>
+          <Button className="bg-orange-600 hover:bg-orange-700">
+            <ShoppingCartIcon className="w-4 h-4 mr-2" />
+            New Cafe Order
+          </Button>
+        </DialogTrigger>
+      )}
+      <DialogContent className="bg-slate-800 border-slate-700 text-white max-w-4xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>
+            {existingOrderId ? 'Add Items to Order' : 'New Cafe Order'}
+          </DialogTitle>
+        </DialogHeader>
         
-        {orders.length === 0 && !isLoading && (
-          <Card className="bg-slate-800 border-slate-700 col-span-full">
-            <CardContent className="text-center py-8">
-              <div className="text-gray-400">No active orders found</div>
-            </CardContent>
-          </Card>
-        )}
-      </div>
-    </div>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Products Section */}
+          <div>
+            <h3 className="text-lg font-semibold mb-4">Available Products</h3>
+            <div className="grid grid-cols-1 gap-3 max-h-96 overflow-y-auto">
+              {cafeProducts.filter(p => p.active && p.stock > 0).map((product) => (
+                <Card key={product.id} className="bg-slate-700 border-slate-600">
+                  <CardContent className="p-3">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <div className="font-medium">{product.name}</div>
+                        <div className="text-sm text-gray-300">
+                          {product.price} EGP • Stock: {product.stock}
+                        </div>
+                      </div>
+                      <Button 
+                        size="sm" 
+                        onClick={() => addToCart(product)}
+                        className="bg-green-600 hover:bg-green-700"
+                      >
+                        <PlusIcon className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          </div>
+
+          {/* Cart Section */}
+          <div>
+            <h3 className="text-lg font-semibold mb-4">Shopping Cart</h3>
+            
+            {!existingOrderId && (
+              <div className="space-y-4 mb-6">
+                <div>
+                  <Label htmlFor="customerName">Customer Name</Label>
+                  <Input
+                    id="customerName"
+                    value={customerName}
+                    onChange={(e) => setCustomerName(e.target.value)}
+                    className="bg-slate-700 border-slate-600 text-white"
+                    placeholder="Enter customer name"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <Label>Payment Method</Label>
+                  <Select value={paymentMethod} onValueChange={(value: 'cash' | 'card' | 'transfer') => setPaymentMethod(value)}>
+                    <SelectTrigger className="bg-slate-700 border-slate-600 text-white">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="bg-slate-700 border-slate-600">
+                      <SelectItem value="cash" className="text-white">Cash</SelectItem>
+                      <SelectItem value="card" className="text-white">Card</SelectItem>
+                      <SelectItem value="transfer" className="text-white">Transfer</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            )}
+
+            <div className="space-y-3 mb-4 max-h-48 overflow-y-auto">
+              {cart.map((item) => (
+                <Card key={item.id} className="bg-slate-700 border-slate-600">
+                  <CardContent className="p-3">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <div className="font-medium">{item.name}</div>
+                        <div className="text-sm text-gray-300">
+                          {item.price} EGP each
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Button 
+                          size="sm" 
+                          variant="outline"
+                          onClick={() => updateQuantity(item.id, item.quantity - 1)}
+                        >
+                          <MinusIcon className="w-3 h-3" />
+                        </Button>
+                        <span className="w-8 text-center">{item.quantity}</span>
+                        <Button 
+                          size="sm" 
+                          variant="outline"
+                          onClick={() => updateQuantity(item.id, item.quantity + 1)}
+                        >
+                          <PlusIcon className="w-3 h-3" />
+                        </Button>
+                        <Button 
+                          size="sm" 
+                          variant="destructive"
+                          onClick={() => removeFromCart(item.id)}
+                        >
+                          <TrashIcon className="w-3 h-3" />
+                        </Button>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+
+            {cart.length === 0 && (
+              <div className="text-center text-gray-400 py-8">
+                Cart is empty
+              </div>
+            )}
+
+            {cart.length > 0 && (
+              <div className="space-y-4">
+                <div className="flex justify-between text-lg font-bold">
+                  <span>Total:</span>
+                  <span className="text-green-400">{getTotalAmount().toFixed(2)} EGP</span>
+                </div>
+                
+                <Button 
+                  onClick={processOrder}
+                  disabled={isProcessing || cart.length === 0 || (!existingOrderId && !customerName.trim())}
+                  className="w-full bg-green-600 hover:bg-green-700"
+                >
+                  {isProcessing 
+                    ? 'Processing...' 
+                    : existingOrderId 
+                      ? `Add Items to Order` 
+                      : `Process Order (${new Date().toLocaleTimeString()})`}
+                </Button>
+              </div>
+            )}
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 };
 
-export default CurrentOrders;
+export default CafeCartProcessor;

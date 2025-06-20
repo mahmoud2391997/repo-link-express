@@ -29,52 +29,74 @@ const AuthPage = ({ onAuthSuccess }: AuthPageProps) => {
     checkAuth();
   }, [onAuthSuccess]);
 
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsLoading(true);
+const handleLogin = async (e: React.FormEvent) => {
+  e.preventDefault();
+  setIsLoading(true);
 
-    try {
-      // First, sign in the user
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email: loginForm.email,
-        password: loginForm.password,
-      });
+  try {
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email: loginForm.email,
+      password: loginForm.password,
+    });
 
-      if (error) throw error;
+    if (error) throw error;
 
-      if (data.user) {
-        // Check if user has the required role
-        const { data: profile, error: profileError } = await supabase
-          .from('profiles')
-          .select('role')
-          .eq('id', data.user.id)
-          .single();
+    const userId = data.user?.id;
+console.log(userId);
 
-        if (profileError) {
-          throw new Error('Failed to fetch user profile');
-        }
+    // 🔍 Try to fetch the profile
+    const { data: profile, error: profileError } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', userId)
+      .single();
+console.log(data);
 
-        if (profile.role !== loginForm.role) {
-          await supabase.auth.signOut();
-          throw new Error(`Access denied. You don't have ${loginForm.role} privileges.`);
-        }
-
-        toast({
-          title: "Success",
-          description: `Logged in successfully as ${profile.role}!`,
+    // 🚨 If profile missing or not found (status code 406 or 404)
+    if (profileError && (profileError.code === 'PGRST116' || profileError.code === 'PGRST107')) {
+      // Optional: Auto-create profile if missing
+      const { error: insertError } = await supabase
+        .from('profiles')
+        .insert({
+          id: userId,
+          email: loginForm.email,
+          role: loginForm.role,
         });
-        onAuthSuccess();
-      }
-    } catch (error: any) {
-      toast({
-        title: "Error",
-        description: error.message || "Failed to sign in",
-        variant: "destructive",
-      });
-    } finally {
-      setIsLoading(false);
+
+      if (insertError) throw new Error("Failed to create user profile");
     }
-  };
+
+    // 🔁 Re-fetch after insert or use existing one
+    const { data: finalProfile, error: finalError } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', userId)
+      .single();
+
+    if (finalError) throw new Error('Failed to fetch final profile');
+
+    if (finalProfile.role !== loginForm.role) {
+      await supabase.auth.signOut();
+      throw new Error(`Access denied. You don't have ${loginForm.role} privileges.`);
+    }
+
+    toast({
+      title: "Success",
+      description: `Logged in as ${finalProfile.role}`,
+    });
+
+    onAuthSuccess();
+  } catch (error: any) {
+    toast({
+      title: "Error",
+      description: error.message || "Login failed",
+      variant: "destructive",
+    });
+  } finally {
+    setIsLoading(false);
+  }
+};
+
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-slate-900 to-black flex items-center justify-center p-4">

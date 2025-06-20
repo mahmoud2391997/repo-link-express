@@ -55,6 +55,7 @@ const App = () => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       setUser(session?.user ?? null);
+      console.log(session?.user);
       
       if (session?.user) {
         supabase
