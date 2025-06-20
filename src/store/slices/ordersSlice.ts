@@ -1,4 +1,3 @@
-
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import { Order, getOrders, createOrder, updateOrder, deleteOrder } from '@/services/supabaseService';
 
@@ -35,7 +34,8 @@ export const addOrder = createAsyncThunk(
 
 export const editOrder = createAsyncThunk(
   'orders/editOrder',
-  async ({ id, updates }: { id: string; updates: Partial<Order> }) => {
+  async (params: { id: string; updates: Partial<Order> }) => {
+    const { id, updates } = params;
     const updatedOrder = await updateOrder(id, updates);
     return updatedOrder;
   }

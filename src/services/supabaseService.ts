@@ -341,3 +341,13 @@ export const updateUserProfile = async (userId: string, updates: { email?: strin
   if (error) throw error;
   return data;
 };
+
+// Add the missing createTransaction and addOrder functions that are being imported
+export const addOrder = createOrder; // Alias for consistency with Redux actions
+
+// Enhanced updateOrder function to handle the response format expected by Redux
+export const updateOrderEnhanced = async (params: { id: string; updates: Partial<Order> }) => {
+  const { id, updates } = params;
+  const updatedOrder = await updateOrder(id, updates);
+  return { payload: updatedOrder };
+};
