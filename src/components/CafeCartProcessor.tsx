@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -19,10 +18,11 @@ interface CartItem {
 
 interface CafeCartProcessorProps {
   cafeProducts: any[];
+  existingOrderId?: string;
   onOrderProcessed?: () => void;
 }
 
-const CafeCartProcessor = ({ cafeProducts, onOrderProcessed }: CafeCartProcessorProps) => {
+const CafeCartProcessor = ({ cafeProducts, existingOrderId, onOrderProcessed }: CafeCartProcessorProps) => {
   const [isOpen, setIsOpen] = useState(false);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [customerName, setCustomerName] = useState('');
@@ -67,7 +67,7 @@ const CafeCartProcessor = ({ cafeProducts, onOrderProcessed }: CafeCartProcessor
   };
 
   const processOrder = async () => {
-    if (!customerName.trim()) {
+    if (!existingOrderId && !customerName.trim()) {
       toast({
         title: "Error",
         description: "Please enter customer name",
@@ -88,20 +88,24 @@ const CafeCartProcessor = ({ cafeProducts, onOrderProcessed }: CafeCartProcessor
     setIsProcessing(true);
     try {
       const totalAmount = getTotalAmount();
-      
-      // Create order
-      const order = await createOrder({
-        customer_name: customerName.trim(),
-        order_type: 'cafe_order',
-        total_amount: totalAmount,
-        status: 'active',
-        start_time: new Date().toISOString()
-      });
+      let orderId = existingOrderId;
+
+      // If no existing order, create a new one
+      if (!existingOrderId) {
+        const order = await createOrder({
+          customer_name: customerName.trim(),
+          order_type: 'cafe_order',
+          total_amount: totalAmount,
+          status: 'active',
+          start_time: new Date().toISOString()
+        });
+        orderId = order.id!;
+      }
 
       // Create order items
       for (const item of cart) {
         await createOrderItem({
-          order_id: order.id!,
+          order_id: orderId!,
           item_type: 'cafe_product',
           item_name: item.name,
           quantity: item.quantity,
@@ -110,18 +114,22 @@ const CafeCartProcessor = ({ cafeProducts, onOrderProcessed }: CafeCartProcessor
         });
       }
 
-      // Create transaction
-      await createTransaction({
-        order_id: order.id!,
-        transaction_type: 'payment',
-        amount: totalAmount,
-        payment_method: paymentMethod,
-        description: `Cafe order for ${customerName.trim()} - ${cart.length} items`
-      });
+      // Create transaction only if it's a new order
+      if (!existingOrderId) {
+        await createTransaction({
+          order_id: orderId!,
+          transaction_type: 'payment',
+          amount: totalAmount,
+          payment_method: paymentMethod,
+          description: `Cafe order for ${customerName.trim()} - ${cart.length} items`
+        });
+      }
 
       toast({
         title: "Success",
-        description: `Order processed successfully! Order ID: ${order.id}`,
+        description: existingOrderId 
+          ? `Items added to existing order successfully!`
+          : `Order processed successfully! Order ID: ${orderId}`,
       });
 
       // Reset form
@@ -150,12 +158,14 @@ const CafeCartProcessor = ({ cafeProducts, onOrderProcessed }: CafeCartProcessor
       <DialogTrigger asChild>
         <Button className="bg-orange-600 hover:bg-orange-700">
           <ShoppingCartIcon className="w-4 h-4 mr-2" />
-          Process Cafe Order
+          {existingOrderId ? 'Add Items' : 'Process Cafe Order'}
         </Button>
       </DialogTrigger>
       <DialogContent className="bg-slate-800 border-slate-700 text-white max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Cafe Order Processing</DialogTitle>
+          <DialogTitle>
+            {existingOrderId ? 'Add Items to Order' : 'Cafe Order Processing'}
+          </DialogTitle>
         </DialogHeader>
         
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -191,33 +201,35 @@ const CafeCartProcessor = ({ cafeProducts, onOrderProcessed }: CafeCartProcessor
           <div>
             <h3 className="text-lg font-semibold mb-4">Shopping Cart</h3>
             
-            <div className="space-y-4 mb-6">
-              <div>
-                <Label htmlFor="customerName">Customer Name</Label>
-                <Input
-                  id="customerName"
-                  value={customerName}
-                  onChange={(e) => setCustomerName(e.target.value)}
-                  className="bg-slate-700 border-slate-600 text-white"
-                  placeholder="Enter customer name"
-                  required
-                />
-              </div>
+            {!existingOrderId && (
+              <div className="space-y-4 mb-6">
+                <div>
+                  <Label htmlFor="customerName">Customer Name</Label>
+                  <Input
+                    id="customerName"
+                    value={customerName}
+                    onChange={(e) => setCustomerName(e.target.value)}
+                    className="bg-slate-700 border-slate-600 text-white"
+                    placeholder="Enter customer name"
+                    required
+                  />
+                </div>
 
-              <div>
-                <Label>Payment Method</Label>
-                <Select value={paymentMethod} onValueChange={(value: 'cash' | 'card' | 'transfer') => setPaymentMethod(value)}>
-                  <SelectTrigger className="bg-slate-700 border-slate-600 text-white">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent className="bg-slate-700 border-slate-600">
-                    <SelectItem value="cash" className="text-white">Cash</SelectItem>
-                    <SelectItem value="card" className="text-white">Card</SelectItem>
-                    <SelectItem value="transfer" className="text-white">Transfer</SelectItem>
-                  </SelectContent>
-                </Select>
+                <div>
+                  <Label>Payment Method</Label>
+                  <Select value={paymentMethod} onValueChange={(value: 'cash' | 'card' | 'transfer') => setPaymentMethod(value)}>
+                    <SelectTrigger className="bg-slate-700 border-slate-600 text-white">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="bg-slate-700 border-slate-600">
+                      <SelectItem value="cash" className="text-white">Cash</SelectItem>
+                      <SelectItem value="card" className="text-white">Card</SelectItem>
+                      <SelectItem value="transfer" className="text-white">Transfer</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
-            </div>
+            )}
 
             <div className="space-y-3 mb-4 max-h-48 overflow-y-auto">
               {cart.map((item) => (
@@ -275,10 +287,15 @@ const CafeCartProcessor = ({ cafeProducts, onOrderProcessed }: CafeCartProcessor
                 
                 <Button 
                   onClick={processOrder}
-                  disabled={isProcessing || cart.length === 0 || !customerName.trim()}
+                  disabled={isProcessing || cart.length === 0 || (!existingOrderId && !customerName.trim())}
                   className="w-full bg-green-600 hover:bg-green-700"
                 >
-                  {isProcessing ? 'Processing...' : `Process Order (${new Date().toLocaleTimeString()})`}
+                  {isProcessing 
+                    ? 'Processing...' 
+                    : existingOrderId 
+                      ? `Add Items to Order`
+                      : `Process Order (${new Date().toLocaleTimeString()})`
+                  }
                 </Button>
               </div>
             )}
