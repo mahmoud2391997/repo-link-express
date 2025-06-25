@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -20,13 +21,12 @@ const RoomCard = ({ room, onClick, onEndSession }: RoomCardProps) => {
   useEffect(() => {
     let timer: NodeJS.Timeout | null = null;
 
-    if (room.status === 'occupied' && room.current_customer_name) {
+    if (room.status === 'occupied' && room.current_customer_name && room.current_session_start) {
       if (!room.current_session_end) {
-        // Open time: count up from start
-        const startTime = room.current_session_start ? new Date(room.current_session_start) : new Date();
-        
+        // Open time: count up from start (start from 0)
         const updateElapsedTime = () => {
           const now = new Date();
+          const startTime = new Date(room.current_session_start!);
           const diff = now.getTime() - startTime.getTime();
           const seconds = Math.floor(diff / 1000);
           setElapsedSeconds(seconds);
@@ -96,7 +96,7 @@ const RoomCard = ({ room, onClick, onEndSession }: RoomCardProps) => {
   ]);
 
   const calculateEstimatedCost = () => {
-    if (!room.current_session_start || room.current_total_cost !== null) {
+    if (!room.current_session_start) {
       return null;
     }
 
@@ -177,19 +177,35 @@ const RoomCard = ({ room, onClick, onEndSession }: RoomCardProps) => {
               )}
             </div>
             
-            {/* Show total cost if available (after session is stopped) */}
-            {room.current_total_cost != null && (
-              <div className="text-sm text-green-400">
-                Total: {room.current_total_cost} EGP
+            {/* Show final total cost if session has ended */}
+            {room.current_total_cost != null && room.status === 'available' && (
+              <div className="text-sm text-green-400 font-bold">
+                Final Total: {room.current_total_cost.toFixed(2)} EGP
               </div>
             )}
             
-            {/* Show estimated cost for open time sessions */}
-            {!room.current_session_end && room.current_total_cost == null && (
+            {/* Show live estimated cost for active open time sessions */}
+            {room.status === 'occupied' && !room.current_session_end && (
               <div className="text-sm text-blue-400">
-                Estimated: ~{calculateEstimatedCost()} EGP
+                Current Cost: ~{calculateEstimatedCost()} EGP
               </div>
             )}
+            
+            {/* Show remaining time for fixed time sessions */}
+            {room.status === 'occupied' && room.current_session_end && (
+              <div className="text-sm text-yellow-400">
+                {timeDisplay !== 'EXPIRED' ? 'Time Remaining' : 'Session Expired'}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Show final cost briefly after session ends */}
+        {room.status === 'available' && room.current_total_cost != null && (
+          <div className="bg-green-900 p-2 rounded text-center">
+            <div className="text-green-400 text-sm font-bold">
+              Last Session: {room.current_total_cost.toFixed(2)} EGP
+            </div>
           </div>
         )}
 

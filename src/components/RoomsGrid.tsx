@@ -19,8 +19,15 @@ const RoomsGrid = () => {
 
   const handleBookRoom = async (roomId: string, customerName: string, hours: number, mode: 'single' | 'multiplayer') => {
     try {
-      const endTime = new Date();
-      endTime.setHours(endTime.getHours() + hours);
+      const startTime = new Date().toISOString();
+      let endTime = null;
+      
+      // Only set end time if it's not open time (hours > 0)
+      if (hours > 0) {
+        const end = new Date();
+        end.setHours(end.getHours() + hours);
+        endTime = end.toISOString();
+      }
 
       await dispatch(editRoom({
         id: roomId,
@@ -28,8 +35,9 @@ const RoomsGrid = () => {
           status: 'occupied',
           current_customer_name: customerName,
           current_mode: mode,
-          current_session_start: new Date().toISOString(),
-          current_session_end: endTime.toISOString()
+          current_session_start: startTime,
+          current_session_end: endTime, // null for open time
+          current_total_cost: null // Reset total cost
         }
       }));
       
@@ -49,6 +57,20 @@ const RoomsGrid = () => {
 
   const handleEndSession = async (roomId: string) => {
     try {
+      const room = rooms.find(r => r.id === roomId);
+      if (!room || !room.current_session_start) {
+        console.error('Room or session start time not found');
+        return;
+      }
+
+      const endTime = new Date();
+      const startTime = new Date(room.current_session_start);
+      const elapsedHours = (endTime.getTime() - startTime.getTime()) / (1000 * 60 * 60);
+      
+      // Calculate cost based on elapsed time
+      const hourlyRate = room.current_mode === 'single' ? room.pricing_single : room.pricing_multiplayer;
+      const calculatedCost = elapsedHours * hourlyRate;
+
       await dispatch(editRoom({
         id: roomId,
         updates: {
@@ -57,9 +79,11 @@ const RoomsGrid = () => {
           current_mode: null,
           current_session_start: null,
           current_session_end: null,
-          current_total_cost: 0
+          current_total_cost: calculatedCost
         }
       }));
+
+      console.log(`Session ended. Duration: ${elapsedHours.toFixed(2)} hours, Cost: ${calculatedCost.toFixed(2)} EGP`);
     } catch (error) {
       console.error('Error ending session:', error);
     }
