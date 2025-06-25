@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -8,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
-import { ShoppingCartIcon, PlusIcon, ClockIcon, PlayIcon, StopCircleIcon, EditIcon, CheckIcon, XIcon } from 'lucide-react';
+import { ShoppingCartIcon, PlusIcon, ClockIcon, PlayIcon, StopCircleIcon, EditIcon, CheckIcon, XIcon, MinusIcon } from 'lucide-react';
 import { fetchOrders, editOrder, addOrder } from '@/store/slices/ordersSlice';
 import { fetchRooms, editRoom } from '@/store/slices/roomsSlice';
 import { fetchCafeProducts } from '@/store/slices/cafeProductsSlice';
@@ -52,6 +51,55 @@ const CurrentOrders = () => {
   }, [dispatch]);
 
   const activeOrders = orders.filter((order: any) => order.status === 'active');
+
+  const adjustOrderTime = async (orderId: string, roomId: string, adjustment: number) => {
+    try {
+      const room = rooms.find(r => r.id === roomId);
+      const order = orders.find(o => o.id === orderId);
+      
+      if (!room || !order || !room.current_session_end) {
+        toast({
+          title: "Error",
+          description: "Cannot adjust time for this session",
+          variant: "destructive",
+          duration: 3000,
+        });
+        return;
+      }
+
+      const currentEndTime = new Date(room.current_session_end);
+      const newEndTime = new Date(currentEndTime.getTime() + (adjustment * 60 * 60 * 1000));
+
+      // Update room end time
+      await dispatch(editRoom({
+        id: roomId,
+        updates: {
+          current_session_end: newEndTime.toISOString()
+        }
+      }));
+
+      // Update order end time
+      await dispatch(editOrder({
+        id: orderId,
+        updates: {
+          end_time: newEndTime.toISOString()
+        }
+      }));
+
+      toast({
+        title: adjustment > 0 ? "Time Added" : "Time Reduced",
+        description: `${Math.abs(adjustment * 60)} minutes ${adjustment > 0 ? 'added to' : 'removed from'} session`,
+        duration: 3000,
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to adjust session time",
+        variant: "destructive",
+        duration: 3000,
+      });
+    }
+  };
 
   const startRoomSession = async (order: any) => {
     try {
@@ -387,6 +435,8 @@ const CurrentOrders = () => {
             const room = rooms.find(r => r.id === order.room_id);
             const isRoomOrder = order.order_type === 'room_reservation' || order.order_type === 'combo';
             const isSessionActive = room && room.status === 'occupied' && room.current_customer_name === order.customer_name;
+            const remainingTime = getRemainingTime(order.end_time);
+            const isExpired = remainingTime === 'Time Up!';
 
             return (
               <Card key={order.id} className="bg-slate-800 border-slate-700">
@@ -420,8 +470,8 @@ const CurrentOrders = () => {
                         </div>
                       )}
                       {!order.is_open_time && order.end_time && isSessionActive && (
-                        <div className="text-yellow-400 text-sm">
-                          {getRemainingTime(order.end_time)}
+                        <div className={`text-sm ${isExpired ? 'text-red-400 font-bold' : 'text-yellow-400'}`}>
+                          {remainingTime}
                         </div>
                       )}
                     </div>
@@ -440,6 +490,45 @@ const CurrentOrders = () => {
                       </div>
                     ))}
                   </div>
+
+                  {/* Time adjustment for active sessions with fixed time */}
+                  {isSessionActive && !order.is_open_time && order.end_time && (
+                    <div className="flex items-center justify-center gap-2 py-2 border-t border-slate-600">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => adjustOrderTime(order.id, order.room_id, -0.5)}
+                        className="h-8"
+                      >
+                        <MinusIcon className="w-3 h-3 mr-1" />
+                        -30min
+                      </Button>
+                      <span className="text-xs text-gray-400 px-2">Adjust Time</span>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => adjustOrderTime(order.id, order.room_id, 0.5)}
+                        className="h-8"
+                      >
+                        <PlusIcon className="w-3 h-3 mr-1" />
+                        +30min
+                      </Button>
+                    </div>
+                  )}
+
+                  {/* Add time button for expired sessions */}
+                  {isSessionActive && isExpired && (
+                    <div className="flex justify-center py-2 border-t border-slate-600">
+                      <Button
+                        size="sm"
+                        onClick={() => adjustOrderTime(order.id, order.room_id, 0.5)}
+                        className="bg-yellow-600 hover:bg-yellow-700"
+                      >
+                        <PlusIcon className="w-3 h-3 mr-1" />
+                        Add 30min
+                      </Button>
+                    </div>
+                  )}
 
                   {/* Action Buttons */}
                   <div className="flex gap-2 pt-2">

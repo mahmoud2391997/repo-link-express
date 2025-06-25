@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { RootState, AppDispatch } from '@/store/store';
@@ -6,12 +5,14 @@ import { fetchRooms, editRoom } from '@/store/slices/roomsSlice';
 import RoomCard from '@/components/RoomCard';
 import BookingModal from '@/components/BookingModal';
 import { Room } from '@/services/supabaseService';
+import { useToast } from '@/hooks/use-toast';
 
 const RoomsGrid = () => {
   const dispatch = useDispatch<AppDispatch>();
   const { rooms, loading, error } = useSelector((state: RootState) => state.rooms);
   const [selectedRoom, setSelectedRoom] = useState<Room | null>(null);
   const [isBookingModalOpen, setIsBookingModalOpen] = useState(false);
+  const { toast } = useToast();
 
   useEffect(() => {
     dispatch(fetchRooms());
@@ -89,6 +90,40 @@ const RoomsGrid = () => {
     }
   };
 
+  const handleAdjustTime = async (roomId: string, adjustment: number) => {
+    try {
+      const room = rooms.find(r => r.id === roomId);
+      if (!room || !room.current_session_end) {
+        console.error('Room or session end time not found');
+        return;
+      }
+
+      const currentEndTime = new Date(room.current_session_end);
+      const newEndTime = new Date(currentEndTime.getTime() + (adjustment * 60 * 60 * 1000));
+
+      await dispatch(editRoom({
+        id: roomId,
+        updates: {
+          current_session_end: newEndTime.toISOString()
+        }
+      }));
+
+      toast({
+        title: adjustment > 0 ? "Time Added" : "Time Reduced",
+        description: `${Math.abs(adjustment * 60)} minutes ${adjustment > 0 ? 'added to' : 'removed from'} session`,
+        duration: 3000,
+      });
+    } catch (error) {
+      console.error('Error adjusting time:', error);
+      toast({
+        title: "Error",
+        description: "Failed to adjust session time",
+        variant: "destructive",
+        duration: 3000,
+      });
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex justify-center items-center h-64">
@@ -114,6 +149,7 @@ const RoomsGrid = () => {
             room={room}
             onClick={() => handleRoomClick(room)}
             onEndSession={() => handleEndSession(room.id)}
+            onAdjustTime={handleAdjustTime}
           />
         ))}
       </div>

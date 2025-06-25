@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { PlayIcon, StopCircleIcon, ClockIcon, UserIcon, GamepadIcon } from 'lucide-react';
+import { PlayIcon, StopCircleIcon, ClockIcon, UserIcon, GamepadIcon, PlusIcon, MinusIcon } from 'lucide-react';
 import { Room } from '@/services/supabaseService';
 import { showSessionEndNotification } from '@/utils/notificationUtils';
 
@@ -11,9 +11,10 @@ interface RoomCardProps {
   room: Room;
   onClick: () => void;
   onEndSession: () => void;
+  onAdjustTime?: (roomId: string, adjustment: number) => void;
 }
 
-const RoomCard = ({ room, onClick, onEndSession }: RoomCardProps) => {
+const RoomCard = ({ room, onClick, onEndSession, onAdjustTime }: RoomCardProps) => {
   const [timeDisplay, setTimeDisplay] = useState<string>('');
   const [hasNotified, setHasNotified] = useState(false);
   const [elapsedSeconds, setElapsedSeconds] = useState<number>(0);
@@ -127,6 +128,12 @@ const RoomCard = ({ room, onClick, onEndSession }: RoomCardProps) => {
     return room.console_type === 'PS5' ? 'bg-blue-600' : 'bg-green-600';
   };
 
+  const handleTimeAdjustment = (adjustment: number) => {
+    if (onAdjustTime) {
+      onAdjustTime(room.id, adjustment);
+    }
+  };
+
   return (
     <Card className="bg-slate-800 border-slate-700 hover:border-blue-500 transition-all duration-300 hover:scale-105">
       <CardHeader className="pb-3">
@@ -177,6 +184,29 @@ const RoomCard = ({ room, onClick, onEndSession }: RoomCardProps) => {
               )}
             </div>
             
+            {/* Time adjustment buttons for active sessions */}
+            {room.status === 'occupied' && room.current_session_end && (
+              <div className="flex items-center gap-2 justify-center">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => handleTimeAdjustment(-0.5)}
+                  className="h-6 w-6 p-0"
+                >
+                  <MinusIcon className="w-3 h-3" />
+                </Button>
+                <span className="text-xs text-gray-400 px-2">Adjust Time</span>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => handleTimeAdjustment(0.5)}
+                  className="h-6 w-6 p-0"
+                >
+                  <PlusIcon className="w-3 h-3" />
+                </Button>
+              </div>
+            )}
+            
             {/* Show final total cost if session has ended */}
             {room.current_total_cost != null && room.status === 'available' && (
               <div className="text-sm text-green-400 font-bold">
@@ -195,6 +225,20 @@ const RoomCard = ({ room, onClick, onEndSession }: RoomCardProps) => {
             {room.status === 'occupied' && room.current_session_end && (
               <div className="text-sm text-yellow-400">
                 {timeDisplay !== 'EXPIRED' ? 'Time Remaining' : 'Session Expired'}
+              </div>
+            )}
+
+            {/* Add time button for expired sessions */}
+            {timeDisplay === 'EXPIRED' && (
+              <div className="flex justify-center">
+                <Button
+                  size="sm"
+                  onClick={() => handleTimeAdjustment(0.5)}
+                  className="bg-yellow-600 hover:bg-yellow-700"
+                >
+                  <PlusIcon className="w-3 h-3 mr-1" />
+                  Add 30min
+                </Button>
               </div>
             )}
           </div>
