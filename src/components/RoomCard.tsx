@@ -185,7 +185,7 @@ const RoomCard = ({ room, onClick, onEndSession, onAdjustTime }: RoomCardProps) 
             </div>
             
             {/* Time adjustment buttons for active sessions */}
-            {room.status === 'occupied' && room.current_session_end && (
+            {room.current_session_end && (
               <div className="flex items-center gap-2 justify-center">
                 <Button
                   size="sm"
@@ -207,22 +207,15 @@ const RoomCard = ({ room, onClick, onEndSession, onAdjustTime }: RoomCardProps) 
               </div>
             )}
             
-            {/* Show final total cost if session has ended */}
-            {room.current_total_cost != null && room.status === 'available' && (
-              <div className="text-sm text-green-400 font-bold">
-                Final Total: {room.current_total_cost.toFixed(2)} EGP
-              </div>
-            )}
-            
             {/* Show live estimated cost for active open time sessions */}
-            {room.status === 'occupied' && !room.current_session_end && (
+            {!room.current_session_end && (
               <div className="text-sm text-blue-400">
                 Current Cost: ~{calculateEstimatedCost()} EGP
               </div>
             )}
             
             {/* Show remaining time for fixed time sessions */}
-            {room.status === 'occupied' && room.current_session_end && (
+            {room.current_session_end && (
               <div className="text-sm text-yellow-400">
                 {timeDisplay !== 'EXPIRED' ? 'Time Remaining' : 'Session Expired'}
               </div>
