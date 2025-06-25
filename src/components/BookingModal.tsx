@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -20,7 +19,7 @@ interface BookingModalProps {
 
 const BookingModal = ({ isOpen, onClose, room, onBook }: BookingModalProps) => {
   const [customerName, setCustomerName] = useState('');
-  const [hours, setHours] = useState(1);
+  const [hours, setHours] = useState<number | 'open'>(1);
   const [selectedMode, setSelectedMode] = useState<'single' | 'multiplayer'>('single');
   const [cafeProducts, setCafeProducts] = useState<CafeProduct[]>([]);
   const [selectedProducts, setSelectedProducts] = useState<{[key: string]: number}>({});
@@ -33,6 +32,7 @@ const BookingModal = ({ isOpen, onClose, room, onBook }: BookingModalProps) => {
 
   const timeOptions = [
     { value: 0.5, label: '30 minutes' },
+    { value: 'open', label: 'Open Time' }, // changed value to 'open'
     { value: 1, label: '1 hour' },
     { value: 1.5, label: '1.5 hours' },
     { value: 2, label: '2 hours' },
@@ -56,6 +56,7 @@ const BookingModal = ({ isOpen, onClose, room, onBook }: BookingModalProps) => {
   };
 
   const calculateRoomCost = () => {
+    if (hours === 'open') return 0; // or your preferred logic
     return hours * (selectedMode === 'single' ? room.pricing_single : room.pricing_multiplayer);
   };
 
@@ -86,7 +87,8 @@ const BookingModal = ({ isOpen, onClose, room, onBook }: BookingModalProps) => {
       const orderType = Object.keys(selectedProducts).length > 0 ? 'combo' : 'room_reservation';
       const totalAmount = calculateTotalCost();
       const startTime = new Date();
-      const endTime = new Date(startTime.getTime() + (hours * 60 * 60 * 1000));
+      // If open time, don't set endTime
+      const endTime = hours === 'open' ? null : new Date(startTime.getTime() + (Number(hours) * 60 * 60 * 1000));
       
       // Create the order
       const order = await createOrder({
@@ -96,14 +98,14 @@ const BookingModal = ({ isOpen, onClose, room, onBook }: BookingModalProps) => {
         total_amount: totalAmount,
         status: 'active',
         start_time: startTime.toISOString(),
-        end_time: endTime.toISOString()
+        end_time: endTime ? endTime.toISOString() : null // null for open time
       });
 
       // Add room time as order item
       await createOrderItem({
         order_id: order.id!,
         item_type: 'room_time',
-        item_name: `${room.name} - ${selectedMode} (${hours}h)`,
+        item_name: `${room.name} - ${selectedMode} (${hours === 'open' ? 'Open Time' : `${hours}h`})`,
         quantity: 1,
         unit_price: calculateRoomCost(),
         total_price: calculateRoomCost()
@@ -136,7 +138,7 @@ const BookingModal = ({ isOpen, onClose, room, onBook }: BookingModalProps) => {
       });
 
       // Update local room state
-      onBook(room.id, customerName.trim(), hours, selectedMode);
+      onBook(room.id, customerName.trim(), hours === 'open' ? 0 : Number(hours), selectedMode);
       
       toast({
         title: "Session Started",
@@ -223,7 +225,7 @@ const BookingModal = ({ isOpen, onClose, room, onBook }: BookingModalProps) => {
 
             <div>
               <Label className="text-white">Duration</Label>
-              <Select value={hours.toString()} onValueChange={(value) => setHours(parseFloat(value))}>
+              <Select value={hours.toString()} onValueChange={(value) => setHours(value === 'open' ? 'open' : parseFloat(value))}>
                 <SelectTrigger className="bg-slate-700 border-slate-600 text-white">
                   <SelectValue />
                 </SelectTrigger>
@@ -306,7 +308,9 @@ const BookingModal = ({ isOpen, onClose, room, onBook }: BookingModalProps) => {
                   <ClockIcon className="w-4 h-4" />
                   Room Cost:
                 </span>
-                <span>{calculateRoomCost().toFixed(2)} EGP</span>
+                <span>
+                  {hours === 'open' ? 'To be calculated' : `${calculateRoomCost().toFixed(2)} EGP`}
+                </span>
               </div>
               {calculateCafeCost() > 0 && (
                 <div className="flex items-center justify-between">

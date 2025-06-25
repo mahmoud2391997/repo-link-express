@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -14,52 +13,113 @@ interface RoomCardProps {
 }
 
 const RoomCard = ({ room, onClick, onEndSession }: RoomCardProps) => {
-  const [timeRemaining, setTimeRemaining] = useState<string>('');
+  const [timeDisplay, setTimeDisplay] = useState<string>('');
   const [hasNotified, setHasNotified] = useState(false);
+  const [elapsedSeconds, setElapsedSeconds] = useState<number>(0);
 
   useEffect(() => {
-    if (room.status === 'occupied' && room.current_session_end) {
-      const timer = setInterval(() => {
-        const now = new Date();
-        const endTime = new Date(room.current_session_end!);
-        const diff = endTime.getTime() - now.getTime();
-        
-        if (diff <= 0) {
-          setTimeRemaining('EXPIRED');
-          
-          // Show notification only once when session expires
-          if (!hasNotified && room.current_customer_name) {
-            showSessionEndNotification(room.name, room.current_customer_name);
-            setHasNotified(true);
-          }
-          return;
-        }
-        
-        // Reset notification flag if time is extended
-        if (hasNotified && diff > 0) {
-          setHasNotified(false);
-        }
-        
-        const hours = Math.floor(diff / (1000 * 60 * 60));
-        const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-        const seconds = Math.floor((diff % (1000 * 60)) / 1000);
-        
-        setTimeRemaining(`${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`);
-      }, 1000);
+    let timer: NodeJS.Timeout | null = null;
 
-      return () => clearInterval(timer);
+    if (room.status === 'occupied' && room.current_customer_name) {
+      if (!room.current_session_end) {
+        // Open time: count up from start
+        const startTime = room.current_session_start ? new Date(room.current_session_start) : new Date();
+        
+        const updateElapsedTime = () => {
+          const now = new Date();
+          const diff = now.getTime() - startTime.getTime();
+          const seconds = Math.floor(diff / 1000);
+          setElapsedSeconds(seconds);
+          
+          const hours = Math.floor(seconds / 3600);
+          const minutes = Math.floor((seconds % 3600) / 60);
+          const remainingSeconds = seconds % 60;
+          
+          setTimeDisplay(
+            `${hours.toString().padStart(2, '0')}:${minutes
+              .toString()
+              .padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`
+          );
+        };
+
+        // Initial update
+        updateElapsedTime();
+        
+        // Set up interval
+        timer = setInterval(updateElapsedTime, 1000);
+      } else {
+        // Fixed time: count down to end
+        timer = setInterval(() => {
+          const now = new Date();
+          const endTime = new Date(room.current_session_end!);
+          const diff = endTime.getTime() - now.getTime();
+
+          if (diff <= 0) {
+            setTimeDisplay('EXPIRED');
+            if (!hasNotified && room.current_customer_name) {
+              showSessionEndNotification(room.name, room.current_customer_name);
+              setHasNotified(true);
+            }
+            return;
+          }
+
+          if (hasNotified && diff > 0) {
+            setHasNotified(false);
+          }
+
+          const hours = Math.floor(diff / (1000 * 60 * 60));
+          const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+          const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+
+          setTimeDisplay(
+            `${hours.toString().padStart(2, '0')}:${minutes
+              .toString()
+              .padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`
+          );
+        }, 1000);
+      }
+      return () => {
+        if (timer) clearInterval(timer);
+      };
     } else {
       setHasNotified(false);
+      setTimeDisplay('');
+      setElapsedSeconds(0);
     }
-  }, [room.status, room.current_session_end, hasNotified, room.current_customer_name, room.name]);
+  }, [
+    room.status,
+    room.current_session_end,
+    room.current_session_start,
+    hasNotified,
+    room.current_customer_name,
+    room.name,
+  ]);
+
+  const calculateEstimatedCost = () => {
+    if (!room.current_session_start || room.current_total_cost !== null) {
+      return null;
+    }
+
+    const hourlyRate = room.current_mode === 'single' 
+      ? room.pricing_single 
+      : room.pricing_multiplayer;
+    
+    const hours = elapsedSeconds / 3600;
+    return (hours * hourlyRate).toFixed(2);
+  };
 
   const getStatusColor = () => {
     switch (room.status) {
-      case 'available': return 'bg-green-500';
-      case 'occupied': return 'bg-red-500';
-      case 'cleaning': return 'bg-yellow-500';
-      case 'maintenance': return 'bg-orange-500';
-      default: return 'bg-gray-500';
+      case 'available':
+        return 'bg-green-500';
+      case 'occupied':
+        return 'bg-red-500';
+      case 'cleaning':
+        return 'bg-yellow-500';
+      case 'maintenance':
+        return 'bg-orange-500';
+      default:
+        return 'bg-gray-500';
     }
   };
 
@@ -88,7 +148,7 @@ const RoomCard = ({ room, onClick, onEndSession }: RoomCardProps) => {
           )}
         </div>
       </CardHeader>
-      
+
       <CardContent className="space-y-4">
         <div className="text-sm text-gray-300">
           <div className="flex justify-between">
@@ -102,26 +162,40 @@ const RoomCard = ({ room, onClick, onEndSession }: RoomCardProps) => {
         </div>
 
         {room.status === 'occupied' && room.current_customer_name && (
-          <div className={`bg-slate-700 p-3 rounded-lg space-y-2 ${timeRemaining === 'EXPIRED' ? 'border-2 border-red-500 animate-pulse' : ''}`}>
+          <div className={`bg-slate-700 p-3 rounded-lg space-y-2 ${timeDisplay === 'EXPIRED' ? 'border-2 border-red-500 animate-pulse' : ''}`}>
             <div className="flex items-center gap-2 text-white">
               <UserIcon className="w-4 h-4" />
               <span className="text-sm">{room.current_customer_name}</span>
             </div>
             <div className="flex items-center gap-2 text-white">
               <ClockIcon className="w-4 h-4" />
-              <span className={`text-sm font-mono ${timeRemaining === 'EXPIRED' ? 'text-red-400 font-bold' : ''}`}>
-                {timeRemaining}
+              <span className={`text-sm font-mono ${timeDisplay === 'EXPIRED' ? 'text-red-400 font-bold' : ''}`}>
+                {timeDisplay || '00:00:00'}
               </span>
+              {!room.current_session_end && (
+                <span className="ml-2 text-xs text-orange-400">(Open Time)</span>
+              )}
             </div>
-            <div className="text-sm text-green-400">
-              Total: {room.current_total_cost || 0} EGP
-            </div>
+            
+            {/* Show total cost if available (after session is stopped) */}
+            {room.current_total_cost != null && (
+              <div className="text-sm text-green-400">
+                Total: {room.current_total_cost} EGP
+              </div>
+            )}
+            
+            {/* Show estimated cost for open time sessions */}
+            {!room.current_session_end && room.current_total_cost == null && (
+              <div className="text-sm text-blue-400">
+                Estimated: ~{calculateEstimatedCost()} EGP
+              </div>
+            )}
           </div>
         )}
 
         <div className="flex gap-2">
           {room.status === 'available' && (
-            <Button 
+            <Button
               onClick={onClick}
               className="flex-1 bg-green-600 hover:bg-green-700"
             >
@@ -129,9 +203,9 @@ const RoomCard = ({ room, onClick, onEndSession }: RoomCardProps) => {
               Start
             </Button>
           )}
-          
+
           {room.status === 'occupied' && (
-            <Button 
+            <Button
               onClick={onEndSession}
               variant="destructive"
               className="flex-1"
