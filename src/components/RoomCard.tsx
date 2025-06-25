@@ -237,7 +237,7 @@ const RoomCard = ({ room, onClick, onEndSession, onAdjustTime }: RoomCardProps) 
           </div>
         )}
 
-        {/* Show final cost briefly after session ends */}
+        {/* Show final cost briefly after session ends - Fixed the comparison */}
         {room.status === 'available' && room.current_total_cost != null && (
           <div className="bg-green-900 p-2 rounded text-center">
             <div className="text-green-400 text-sm font-bold">
