@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -12,9 +11,11 @@ interface RoomCardProps {
   onClick: () => void;
   onEndSession: () => void;
   onAdjustTime?: (roomId: string, adjustment: number) => void;
+  onStartSession?: () => void;
+  showStartButton?: boolean;
 }
 
-const RoomCard = ({ room, onClick, onEndSession, onAdjustTime }: RoomCardProps) => {
+const RoomCard = ({ room, onClick, onEndSession, onAdjustTime, onStartSession, showStartButton }: RoomCardProps) => {
   const [timeDisplay, setTimeDisplay] = useState<string>('');
   const [hasNotified, setHasNotified] = useState(false);
   const [elapsedSeconds, setElapsedSeconds] = useState<number>(0);
@@ -247,13 +248,24 @@ const RoomCard = ({ room, onClick, onEndSession, onAdjustTime }: RoomCardProps) 
         )}
 
         <div className="flex gap-2">
-          {room.status === 'available' && (
+          {/* Show start button for paused orders */}
+          {showStartButton && onStartSession && (
+            <Button
+              onClick={onStartSession}
+              className="flex-1 bg-green-600 hover:bg-green-700"
+            >
+              <PlayIcon className="w-4 h-4 mr-2" />
+              Start
+            </Button>
+          )}
+
+          {room.status === 'available' && !showStartButton && (
             <Button
               onClick={onClick}
               className="flex-1 bg-green-600 hover:bg-green-700"
             >
               <PlayIcon className="w-4 h-4 mr-2" />
-              Start
+              Book
             </Button>
           )}
 
