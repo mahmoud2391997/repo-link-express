@@ -25,43 +25,49 @@ const App = () => {
   const [user, setUser] = useState<User | null>(null);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
-  const [authInitialized, setAuthInitialized] = useState(false);
 
   useEffect(() => {
-    let isMounted = true;
+    let mounted = true;
 
     const initializeAuth = async () => {
       try {
         // Get initial session
         const { data: { session: initialSession } } = await supabase.auth.getSession();
         
-        if (!isMounted) return;
+        if (!mounted) return;
 
         if (initialSession?.user) {
           setSession(initialSession);
           setUser(initialSession.user);
           
           // Fetch user profile
-          try {
-            const { data: profile, error } = await supabase
-              .from('profiles')
-              .select('*')
-              .eq('id', initialSession.user.id)
-              .single();
-            
-            if (!error && profile && isMounted) {
-              setUserProfile(profile);
-            }
-          } catch (profileError) {
-            console.error('Error fetching initial profile:', profileError);
+          const { data: profile, error } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', initialSession.user.id)
+            .single();
+          
+          if (!error && profile && mounted) {
+            setUserProfile(profile);
+          } else if (mounted) {
+            // If profile doesn't exist, user will need to sign in again
+            console.log('Profile not found for user, signing out');
+            await supabase.auth.signOut();
+            setSession(null);
+            setUser(null);
+            setUserProfile(null);
           }
         }
       } catch (error) {
         console.error('Error initializing auth:', error);
+        if (mounted) {
+          setSession(null);
+          setUser(null);
+          setUserProfile(null);
+        }
       } finally {
-        if (isMounted) {
+        if (mounted) {
           setLoading(false);
-          setAuthInitialized(true);
         }
       }
     };
@@ -69,7 +75,7 @@ const App = () => {
     // Set up auth state listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
-        if (!isMounted) return;
+        if (!mounted) return;
 
         console.log('Auth state changed:', event, session?.user?.email);
         
@@ -78,28 +84,31 @@ const App = () => {
         
         if (session?.user) {
           try {
-            const { data: profile } = await supabase
+            const { data: profile, error } = await supabase
               .from('profiles')
               .select('*')
               .eq('id', session.user.id)
               .single();
             
-            if (isMounted) {
+            if (!error && profile && mounted) {
               setUserProfile(profile);
+            } else if (mounted) {
+              setUserProfile(null);
             }
           } catch (error) {
             console.error('Error fetching user profile:', error);
-            if (isMounted) {
+            if (mounted) {
               setUserProfile(null);
             }
           }
         } else {
-          if (isMounted) {
+          if (mounted) {
             setUserProfile(null);
           }
         }
         
-        if (isMounted && authInitialized) {
+        // Always set loading to false after auth state change
+        if (mounted) {
           setLoading(false);
         }
       }
@@ -108,45 +117,24 @@ const App = () => {
     initializeAuth();
 
     return () => {
-      isMounted = false;
+      mounted = false;
       subscription.unsubscribe();
     };
-  }, [authInitialized]);
+  }, []);
 
   const handleAuthSuccess = async () => {
-    setLoading(true);
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      
-      if (session?.user) {
-        setSession(session);
-        setUser(session.user);
-        
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', session.user.id)
-          .single();
-        
-        setUserProfile(profile);
-      }
-    } catch (error) {
-      console.error('Error in handleAuthSuccess:', error);
-    } finally {
-      setLoading(false);
-    }
+    // The auth state change listener will handle the state updates
+    // Just ensure we're not loading
+    setLoading(false);
   };
 
   const handleSignOut = async () => {
     try {
       setLoading(true);
       await supabase.auth.signOut();
-      setSession(null);
-      setUser(null);
-      setUserProfile(null);
-      
       // Clear any cached credentials
       sessionStorage.removeItem('gaming_center_credentials');
+      // State will be cleared by the auth state change listener
     } catch (error) {
       console.error('Error signing out:', error);
     } finally {
@@ -154,7 +142,7 @@ const App = () => {
     }
   };
 
-  // Show loading spinner
+  // Show loading spinner only for initial load
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-900 via-slate-900 to-black flex items-center justify-center">
