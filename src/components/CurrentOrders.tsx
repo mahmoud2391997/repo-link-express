@@ -46,7 +46,7 @@ const CurrentOrders = () => {
   });
 
   useEffect(() => {
-    dispatch(fetchOrders());
+    dispatch(fetchOrders(undefined));
     dispatch(fetchRooms());
     dispatch(fetchCafeProducts());
   }, [dispatch]);
@@ -54,7 +54,7 @@ const CurrentOrders = () => {
   // Auto-refresh orders every 30 seconds to sync with room statuses
   useEffect(() => {
     const interval = setInterval(() => {
-      dispatch(fetchOrders());
+      dispatch(fetchOrders(undefined));
       dispatch(fetchRooms());
     }, 30000);
 
@@ -539,7 +539,7 @@ const CurrentOrders = () => {
             New Room Order
           </Button>
           
-          <CafeCartProcessor cafeProducts={products} onOrderProcessed={() => dispatch(fetchOrders())} />
+          <CafeCartProcessor cafeProducts={products} onOrderProcessed={() => dispatch(fetchOrders(undefined))} />
         </div>
       </div>
 
@@ -648,7 +648,7 @@ const CurrentOrders = () => {
                     <CafeCartProcessor 
                       cafeProducts={products} 
                       existingOrderId={order.id}
-                      onOrderProcessed={() => dispatch(fetchOrders())}
+                      onOrderProcessed={() => dispatch(fetchOrders(undefined))}
                     />
                     
                     <Button 

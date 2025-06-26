@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { RootState, AppDispatch } from '@/store/store';
@@ -18,7 +19,7 @@ const RoomsGrid = () => {
 
   useEffect(() => {
     dispatch(fetchRooms());
-    dispatch(fetchOrders());
+    dispatch(fetchOrders(undefined));
   }, [dispatch]);
 
   const handleBookRoom = async (roomId: string, customerName: string, hours: number, mode: 'single' | 'multiplayer') => {
