@@ -2,10 +2,11 @@
 import { User } from '@supabase/supabase-js';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
-import { LogOutIcon, SettingsIcon } from 'lucide-react';
+import { LogOutIcon, SettingsIcon, UsersIcon } from 'lucide-react';
 import AdminDashboard from '@/components/AdminDashboard';
 import CashierDashboard from '@/components/CashierDashboard';
 import Reports from '@/components/Reports';
+import UserEmailManagement from '@/components/UserEmailManagement';
 
 interface UserProfile {
   id: string;
@@ -42,10 +43,14 @@ const Index = ({ user, userProfile, onSignOut }: IndexProps) => {
         {/* Main Content */}
         {isAdmin ? (
           <Tabs defaultValue="admin" className="space-y-6">
-            <TabsList className="grid w-full grid-cols-2 bg-slate-800 border-0 max-w-md">
+            <TabsList className="grid w-full grid-cols-3 bg-slate-800 border-0 max-w-lg">
               <TabsTrigger value="admin" className="data-[state=active]:bg-blue-600 text-white">
                 <SettingsIcon className="w-4 h-4 mr-2" />
                 Admin Panel
+              </TabsTrigger>
+              <TabsTrigger value="users" className="data-[state=active]:bg-blue-600 text-white">
+                <UsersIcon className="w-4 h-4 mr-2" />
+                Users
               </TabsTrigger>
               <TabsTrigger value="reports" className="data-[state=active]:bg-blue-600 text-white">
                 Reports
@@ -54,6 +59,10 @@ const Index = ({ user, userProfile, onSignOut }: IndexProps) => {
 
             <TabsContent value="admin">
               <AdminDashboard />
+            </TabsContent>
+
+            <TabsContent value="users">
+              <UserEmailManagement />
             </TabsContent>
 
             <TabsContent value="reports">

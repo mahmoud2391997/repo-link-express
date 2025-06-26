@@ -7,11 +7,14 @@ import AppointmentsManagement from '@/components/AppointmentsManagement';
 import CafeManagement from '@/components/CafeManagement';
 import CurrentOrders from '@/components/CurrentOrders';
 import TransactionsManagement from '@/components/TransactionsManagement';
-import OrdersManagement from '@/components/OrdersManagement';
+import PaidOrders from '@/components/PaidOrders';
+import AppointmentAlarm from '@/components/AppointmentAlarm';
 
 const CashierDashboard = () => {
   return (
     <div className="space-y-6">
+      <AppointmentAlarm />
+      
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <Card className="bg-slate-800 border-slate-700">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -68,9 +71,9 @@ const CashierDashboard = () => {
             <ClipboardListIcon className="w-4 h-4 mr-2" />
             Current Orders
           </TabsTrigger>
-          <TabsTrigger value="orders" className="data-[state=active]:bg-indigo-600 text-white">
+          <TabsTrigger value="paid-orders" className="data-[state=active]:bg-indigo-600 text-white">
             <PackageIcon className="w-4 h-4 mr-2" />
-            Orders
+            Paid Orders
           </TabsTrigger>
           <TabsTrigger value="appointments" className="data-[state=active]:bg-purple-600 text-white">
             <CalendarIcon className="w-4 h-4 mr-2" />
@@ -101,8 +104,8 @@ const CashierDashboard = () => {
           <CurrentOrders />
         </TabsContent>
 
-        <TabsContent value="orders">
-          <OrdersManagement />
+        <TabsContent value="paid-orders">
+          <PaidOrders />
         </TabsContent>
 
         <TabsContent value="appointments">

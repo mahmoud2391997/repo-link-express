@@ -28,6 +28,7 @@ const CurrentOrders = () => {
   const [newOrderDialog, setNewOrderDialog] = useState(false);
   const [extendTimeDialog, setExtendTimeDialog] = useState(false);
   const [paymentDialog, setPaymentDialog] = useState(false);
+  const [reactivateDialog, setReactivateDialog] = useState(false);
   const [roomOrderForm, setRoomOrderForm] = useState({
     customer_name: '',
     room_id: '',
@@ -40,9 +41,13 @@ const CurrentOrders = () => {
     roomId: '',
     hours: 1
   });
+  const [reactivateForm, setReactivateForm] = useState({
+    duration_hours: 1,
+    is_open_time: false
+  });
 
   useEffect(() => {
-    dispatch(fetchOrders('active'));
+    dispatch(fetchOrders());
     dispatch(fetchRooms());
     dispatch(fetchCafeProducts());
   }, [dispatch]);
@@ -50,14 +55,15 @@ const CurrentOrders = () => {
   // Auto-refresh orders every 30 seconds to sync with room statuses
   useEffect(() => {
     const interval = setInterval(() => {
-      dispatch(fetchOrders('active'));
+      dispatch(fetchOrders());
       dispatch(fetchRooms());
     }, 30000);
 
     return () => clearInterval(interval);
   }, [dispatch]);
 
-  const activeOrders = orders.filter((order: any) => order.status === 'active');
+  // Filter for active and paused orders
+  const currentOrders = orders.filter((order: any) => order.status === 'active' || order.status === 'paused');
 
   const adjustOrderTime = async (orderId: string, roomId: string, adjustment: number) => {
     try {
@@ -243,9 +249,11 @@ const CurrentOrders = () => {
     }
   };
 
-  const reactivateOrder = async (order: any) => {
+  const reactivateOrder = async () => {
+    if (!selectedOrder) return;
+
     try {
-      const room = rooms.find(r => r.id === order.room_id);
+      const room = rooms.find(r => r.id === selectedOrder.room_id);
       if (!room || room.status !== 'available') {
         toast({
           title: "Error",
@@ -259,34 +267,28 @@ const CurrentOrders = () => {
       const startTime = new Date().toISOString();
       let endTime = null;
       
-      // Calculate remaining time from where it was stopped
-      if (order.end_time && !order.is_open_time) {
-        const originalEndTime = new Date(order.end_time);
-        const stopTime = new Date(order.updated_at);
-        const remainingMs = originalEndTime.getTime() - stopTime.getTime();
-        
-        if (remainingMs > 0) {
-          const newEndTime = new Date(Date.now() + remainingMs);
-          endTime = newEndTime.toISOString();
-        }
+      if (!reactivateForm.is_open_time) {
+        const end = new Date();
+        end.setHours(end.getHours() + reactivateForm.duration_hours);
+        endTime = end.toISOString();
       }
 
       // Update room status
       await dispatch(editRoom({
-        id: order.room_id,
+        id: selectedOrder.room_id,
         updates: {
           status: 'occupied',
-          current_customer_name: order.customer_name,
+          current_customer_name: selectedOrder.customer_name,
           current_session_start: startTime,
           current_session_end: endTime,
-          current_mode: order.mode,
-          current_total_cost: order.total_amount
+          current_mode: selectedOrder.mode || roomOrderForm.mode,
+          current_total_cost: selectedOrder.total_amount
         }
       }));
 
       // Update order
       await dispatch(editOrder({
-        id: order.id,
+        id: selectedOrder.id,
         updates: {
           start_time: startTime,
           end_time: endTime,
@@ -294,9 +296,13 @@ const CurrentOrders = () => {
         }
       }));
 
+      setReactivateDialog(false);
+      setSelectedOrder(null);
+      setReactivateForm({ duration_hours: 1, is_open_time: false });
+
       toast({
         title: "Order Reactivated",
-        description: `Room ${room.name} session resumed for ${order.customer_name}`,
+        description: `Room session resumed for ${selectedOrder.customer_name}`,
         duration: 5000,
       });
     } catch (error) {
@@ -518,27 +524,26 @@ const CurrentOrders = () => {
             New Room Order
           </Button>
           
-          <CafeCartProcessor cafeProducts={products} onOrderProcessed={() => dispatch(fetchOrders('active'))} />
+          <CafeCartProcessor cafeProducts={products} onOrderProcessed={() => dispatch(fetchOrders())} />
         </div>
       </div>
 
-      {activeOrders.length === 0 ? (
+      {currentOrders.length === 0 ? (
         <Card className="bg-slate-800 border-slate-700">
           <CardContent className="p-8 text-center">
-            <div className="text-gray-400 text-lg">No active orders</div>
+            <div className="text-gray-400 text-lg">No current orders</div>
           </CardContent>
         </Card>
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
-          {activeOrders.map((order: any) => {
+          {currentOrders.map((order: any) => {
             const room = rooms.find(r => r.id === order.room_id);
             const isRoomOrder = order.order_type === 'room_reservation' || order.order_type === 'combo';
             const isSessionActive = room && room.status === 'occupied' && room.current_customer_name === order.customer_name;
-            const remainingTime = getRemainingTime(order.end_time);
-            const isExpired = remainingTime === 'Time Up!';
+            const isPaused = order.status === 'paused';
 
             return (
-              <Card key={order.id} className="bg-slate-800 border-slate-700">
+              <Card key={order.id} className={`bg-slate-800 border-slate-700 ${isPaused ? 'border-yellow-500' : ''}`}>
                 <CardHeader className="pb-3">
                   <div className="flex justify-between items-start">
                     <div>
@@ -552,8 +557,13 @@ const CurrentOrders = () => {
                             {room.name} - {room.console_type}
                           </Badge>
                         )}
-                        {order.is_open_time && (
+                        {isPaused && (
                           <Badge className="bg-yellow-600 text-white">
+                            PAUSED
+                          </Badge>
+                        )}
+                        {order.is_open_time && (
+                          <Badge className="bg-purple-600 text-white">
                             OPEN TIME
                           </Badge>
                         )}
@@ -561,18 +571,8 @@ const CurrentOrders = () => {
                     </div>
                     <div className="text-right">
                       <div className="text-green-400 font-bold">
-                        {order.is_open_time && isSessionActive ? 'Pay on Stop' : `${order.total_amount.toFixed(2)} EGP`}
+                        {order.is_open_time && isSessionActive ? 'Pay on Stop' : `${order.total_amount?.toFixed(2) || '0.00'} EGP`}
                       </div>
-                      {isSessionActive && order.start_time && (
-                        <div className="text-blue-400 text-sm">
-                          Elapsed: {getSessionDuration(order.start_time)}
-                        </div>
-                      )}
-                      {!order.is_open_time && order.end_time && isSessionActive && (
-                        <div className={`text-sm ${isExpired ? 'text-red-400 font-bold' : 'text-yellow-400'}`}>
-                          {remainingTime}
-                        </div>
-                      )}
                     </div>
                   </div>
                 </CardHeader>
@@ -585,89 +585,29 @@ const CurrentOrders = () => {
                         <span className="text-gray-300">
                           {item.quantity > 0 ? `${item.quantity}x ` : ''}{item.item_name}
                         </span>
-                        <span className="text-white">{item.total_price.toFixed(2)} EGP</span>
+                        <span className="text-white">{item.total_price?.toFixed(2) || '0.00'} EGP</span>
                       </div>
                     ))}
                   </div>
-
-                  {/* Time adjustment for active sessions with fixed time */}
-                  {isSessionActive && !order.is_open_time && order.end_time && (
-                    <div className="flex items-center justify-center gap-2 py-2 border-t border-slate-600">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => adjustOrderTime(order.id, order.room_id, -0.5)}
-                        className="h-8"
-                      >
-                        <MinusIcon className="w-3 h-3 mr-1" />
-                        -30min
-                      </Button>
-                      <span className="text-xs text-gray-400 px-2">Adjust Time</span>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => adjustOrderTime(order.id, order.room_id, 0.5)}
-                        className="h-8"
-                      >
-                        <PlusIcon className="w-3 h-3 mr-1" />
-                        +30min
-                      </Button>
-                    </div>
-                  )}
-
-                  {/* Add time button for expired sessions */}
-                  {isSessionActive && isExpired && (
-                    <div className="flex justify-center gap-2 py-2 border-t border-slate-600">
-                      <Button
-                        size="sm"
-                        onClick={() => {
-                          setTimeExtension({ orderId: order.id, roomId: order.room_id, hours: 0.5 });
-                          setExtendTimeDialog(true);
-                        }}
-                        className="bg-yellow-600 hover:bg-yellow-700"
-                      >
-                        <PlusIcon className="w-3 h-3 mr-1" />
-                        Add Time
-                      </Button>
-                      <Button
-                        size="sm"
-                        onClick={() => {
-                          setSelectedOrder(order);
-                          setPaymentDialog(true);
-                        }}
-                        className="bg-green-600 hover:bg-green-700"
-                      >
-                        <DollarSignIcon className="w-3 h-3 mr-1" />
-                        Pay Now
-                      </Button>
-                    </div>
-                  )}
 
                   {/* Action Buttons */}
                   <div className="flex gap-2 pt-2">
                     {isRoomOrder && room && (
                       <>
-                        {!isSessionActive ? (
-                          <div className="flex gap-1 flex-1">
-                            <Button 
-                              onClick={() => startRoomSession(order)}
-                              className="flex-1 bg-green-600 hover:bg-green-700"
-                              size="sm"
-                            >
-                              <PlayIcon className="w-4 h-4 mr-1" />
-                              Start
-                            </Button>
-                            {order.start_time && (
-                              <Button 
-                                onClick={() => reactivateOrder(order)}
-                                className="flex-1 bg-blue-600 hover:bg-blue-700"
-                                size="sm"
-                              >
-                                Reactivate
-                              </Button>
-                            )}
-                          </div>
-                        ) : (
+                        {isPaused ? (
+                          <Button 
+                            onClick={() => {
+                              setSelectedOrder(order);
+                              setReactivateDialog(true);
+                            }}
+                            className="flex-1 bg-green-600 hover:bg-green-700"
+                            size="sm"
+                            disabled={room.status !== 'available'}
+                          >
+                            <PlayIcon className="w-4 h-4 mr-1" />
+                            Reactivate
+                          </Button>
+                        ) : isSessionActive ? (
                           <Button 
                             onClick={() => stopRoomSession(order)}
                             className="flex-1 bg-red-600 hover:bg-red-700"
@@ -676,77 +616,83 @@ const CurrentOrders = () => {
                             <StopCircleIcon className="w-4 h-4 mr-1" />
                             Stop
                           </Button>
-                        )}
+                        ) : null}
                       </>
                     )}
                     
                     <CafeCartProcessor 
                       cafeProducts={products} 
                       existingOrderId={order.id}
-                      onOrderProcessed={() => dispatch(fetchOrders('active'))}
+                      onOrderProcessed={() => dispatch(fetchOrders())}
                     />
                     
                     <Button 
-                      variant="outline"
+                      onClick={() => {
+                        setSelectedOrder(order);
+                        setPaymentDialog(true);
+                      }}
+                      className="bg-green-600 hover:bg-green-700"
                       size="sm"
-                      onClick={() => setEditingOrderId(editingOrderId === order.id ? null : order.id)}
                     >
-                      <EditIcon className="w-4 h-4" />
+                      <DollarSignIcon className="w-4 h-4 mr-1" />
+                      Pay Now
                     </Button>
                   </div>
-
-                  {editingOrderId === order.id && (
-                    <div className="border-t border-slate-600 pt-3 space-y-2">
-                      <div className="text-sm text-gray-300">Quick Actions:</div>
-                      <div className="flex gap-2">
-                        <Button 
-                          size="sm"
-                          variant="outline"
-                          onClick={() => {
-                            setTimeExtension({ orderId: order.id, roomId: order.room_id, hours: 1 });
-                            setExtendTimeDialog(true);
-                          }}
-                        >
-                          <ClockIcon className="w-4 h-4 mr-1" />
-                          Extend Time
-                        </Button>
-                        <Button 
-                          size="sm"
-                          variant="outline"
-                          onClick={() => {
-                            dispatch(editOrder({
-                              id: order.id,
-                              updates: { status: 'completed' }
-                            }));
-                            setEditingOrderId(null);
-                          }}
-                        >
-                          <CheckIcon className="w-4 h-4 mr-1" />
-                          Complete
-                        </Button>
-                        <Button 
-                          size="sm"
-                          variant="destructive"
-                          onClick={() => {
-                            dispatch(editOrder({
-                              id: order.id,
-                              updates: { status: 'cancelled' }
-                            }));
-                            setEditingOrderId(null);
-                          }}
-                        >
-                          <XIcon className="w-4 h-4 mr-1" />
-                          Cancel
-                        </Button>
-                      </div>
-                    </div>
-                  )}
                 </CardContent>
               </Card>
             );
           })}
         </div>
       )}
+
+      {/* Reactivate Dialog */}
+      <Dialog open={reactivateDialog} onOpenChange={setReactivateDialog}>
+        <DialogContent className="bg-slate-800 border-slate-700 text-white">
+          <DialogHeader>
+            <DialogTitle>Reactivate Order</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="text-gray-300">
+              Customer: <span className="text-white font-medium">{selectedOrder?.customer_name}</span>
+            </div>
+            
+            <div className="flex items-center space-x-2">
+              <input
+                type="checkbox"
+                id="openTime"
+                checked={reactivateForm.is_open_time}
+                onChange={(e) => setReactivateForm({...reactivateForm, is_open_time: e.target.checked})}
+                className="rounded"
+              />
+              <Label htmlFor="openTime">Open Time (Pay when session ends)</Label>
+            </div>
+
+            {!reactivateForm.is_open_time && (
+              <div>
+                <Label>Duration (Hours)</Label>
+                <Input
+                  type="number"
+                  min="0.5"
+                  step="0.5"
+                  value={reactivateForm.duration_hours}
+                  onChange={(e) => setReactivateForm({...reactivateForm, duration_hours: parseFloat(e.target.value)})}
+                  className="bg-slate-700 border-slate-600 text-white"
+                />
+              </div>
+            )}
+
+            <div className="flex gap-2">
+              <Button onClick={reactivateOrder} className="flex-1 bg-green-600 hover:bg-green-700">
+                <PlayIcon className="w-4 h-4 mr-2" />
+                Reactivate Session
+              </Button>
+              <Button onClick={() => setReactivateDialog(false)} variant="outline" className="flex-1">
+                Cancel
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* New Room Order Dialog */}
       <Dialog open={newOrderDialog} onOpenChange={setNewOrderDialog}>

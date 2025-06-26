@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { RootState, AppDispatch } from '@/store/store';
 import { fetchRooms, editRoom } from '@/store/slices/roomsSlice';
+import { editOrder } from '@/store/slices/ordersSlice';
 import RoomCard from '@/components/RoomCard';
 import BookingModal from '@/components/BookingModal';
 import { Room } from '@/services/supabaseService';
@@ -10,6 +11,7 @@ import { useToast } from '@/hooks/use-toast';
 const RoomsGrid = () => {
   const dispatch = useDispatch<AppDispatch>();
   const { rooms, loading, error } = useSelector((state: RootState) => state.rooms);
+  const { orders } = useSelector((state: RootState) => state.orders);
   const [selectedRoom, setSelectedRoom] = useState<Room | null>(null);
   const [isBookingModalOpen, setIsBookingModalOpen] = useState(false);
   const { toast } = useToast();
@@ -72,6 +74,14 @@ const RoomsGrid = () => {
       const hourlyRate = room.current_mode === 'single' ? room.pricing_single : room.pricing_multiplayer;
       const calculatedCost = elapsedHours * hourlyRate;
 
+      // Find the active order for this room
+      const activeOrder = orders.find(order => 
+        order.room_id === roomId && 
+        order.status === 'active' && 
+        order.customer_name === room.current_customer_name
+      );
+
+      // Update room status but keep the session data for potential reactivation
       await dispatch(editRoom({
         id: roomId,
         updates: {
@@ -84,7 +94,25 @@ const RoomsGrid = () => {
         }
       }));
 
-      console.log(`Session ended. Duration: ${elapsedHours.toFixed(2)} hours, Cost: ${calculatedCost.toFixed(2)} EGP`);
+      // Update order status to 'paused' instead of completed so it stays in current orders
+      if (activeOrder) {
+        await dispatch(editOrder({
+          id: activeOrder.id,
+          updates: {
+            status: 'paused',
+            total_amount: calculatedCost,
+            end_time: endTime.toISOString()
+          }
+        }));
+      }
+
+      console.log(`Session paused. Duration: ${elapsedHours.toFixed(2)} hours, Cost: ${calculatedCost.toFixed(2)} EGP`);
+      
+      toast({
+        title: "Session Paused",
+        description: `Session moved to Current Orders for potential reactivation. Cost: ${calculatedCost.toFixed(2)} EGP`,
+        duration: 5000,
+      });
     } catch (error) {
       console.error('Error ending session:', error);
     }
