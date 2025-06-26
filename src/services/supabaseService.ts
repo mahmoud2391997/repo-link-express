@@ -34,9 +34,12 @@ export interface Order {
   customer_name: string;
   order_type: 'room_reservation' | 'cafe_order' | 'combo';
   total_amount: number;
-  status: 'active' | 'completed' | 'cancelled';
+  status: 'active' | 'completed' | 'cancelled' | 'paused';
   start_time?: string;
   end_time?: string;
+  mode?: 'single' | 'multiplayer';
+  is_open_time?: boolean;
+  duration_hours?: number;
   created_at?: string;
   updated_at?: string;
 }
@@ -351,6 +354,42 @@ export const updateUserProfile = async (userId: string, updates: { email?: strin
   
   if (error) throw error;
   return data;
+};
+
+// Check appointment conflicts
+export const checkAppointmentConflicts = async (roomId: string, date: string, time: string, duration: number, excludeId?: string) => {
+  const appointmentStart = new Date(`${date}T${time}`);
+  const appointmentEnd = new Date(appointmentStart.getTime() + (duration * 60 * 60 * 1000));
+  
+  // Check for appointment conflicts
+  let query = supabase
+    .from('appointments')
+    .select('*')
+    .eq('room_id', roomId)
+    .eq('appointment_date', date)
+    .neq('status', 'cancelled');
+    
+  if (excludeId) {
+    query = query.neq('id', excludeId);
+  }
+  
+  const { data: appointments, error } = await query;
+  if (error) throw error;
+  
+  for (const appointment of appointments || []) {
+    const existingStart = new Date(`${appointment.appointment_date}T${appointment.appointment_time}`);
+    const existingEnd = new Date(existingStart.getTime() + (appointment.duration_hours * 60 * 60 * 1000));
+    
+    if (
+      (appointmentStart >= existingStart && appointmentStart < existingEnd) ||
+      (appointmentEnd > existingStart && appointmentEnd <= existingEnd) ||
+      (appointmentStart <= existingStart && appointmentEnd >= existingEnd)
+    ) {
+      return true; // Conflict found
+    }
+  }
+  
+  return false; // No conflicts
 };
 
 // Add the missing createTransaction and addOrder functions that are being imported

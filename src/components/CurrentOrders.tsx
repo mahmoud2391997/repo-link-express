@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
-import { ShoppingCartIcon, PlusIcon, ClockIcon, PlayIcon, StopCircleIcon, EditIcon, CheckIcon, XIcon, MinusIcon, DollarSignIcon } from 'lucide-react';
+import { ShoppingCartIcon, PlusIcon, ClockIcon, PlayIcon, StopCircleIcon, DollarSignIcon } from 'lucide-react';
 import { fetchOrders, editOrder, addOrder } from '@/store/slices/ordersSlice';
 import { fetchRooms, editRoom } from '@/store/slices/roomsSlice';
 import { fetchCafeProducts } from '@/store/slices/cafeProductsSlice';
@@ -24,7 +24,6 @@ const CurrentOrders = () => {
   const { toast } = useToast();
 
   const [selectedOrder, setSelectedOrder] = useState<any>(null);
-  const [editingOrderId, setEditingOrderId] = useState<string | null>(null);
   const [newOrderDialog, setNewOrderDialog] = useState(false);
   const [extendTimeDialog, setExtendTimeDialog] = useState(false);
   const [paymentDialog, setPaymentDialog] = useState(false);
@@ -125,6 +124,11 @@ const CurrentOrders = () => {
       if (!room) return;
 
       const startTime = new Date().toISOString();
+      const formattedStartTime = new Date().toLocaleTimeString('en-US', { 
+        hour12: false, 
+        hour: '2-digit', 
+        minute: '2-digit' 
+      });
       let endTime = null;
       
       // Only set end time if it's not open time
@@ -151,7 +155,7 @@ const CurrentOrders = () => {
       await dispatch(editOrder({
         id: order.id,
         updates: {
-          start_time: startTime,
+          start_time: formattedStartTime,
           end_time: endTime,
           status: 'active'
         }
@@ -177,9 +181,15 @@ const CurrentOrders = () => {
       const room = rooms.find(r => r.id === order.room_id);
       if (!room) return;
 
-      const endTime = new Date().toISOString();
-      const startTime = new Date(order.start_time);
-      const durationHours = (new Date().getTime() - startTime.getTime()) / (1000 * 60 * 60);
+      const endTime = new Date();
+      const formattedEndTime = endTime.toLocaleTimeString('en-US', { 
+        hour12: false, 
+        hour: '2-digit', 
+        minute: '2-digit' 
+      });
+      
+      const startTime = new Date(room.current_session_start || new Date());
+      const durationHours = (endTime.getTime() - startTime.getTime()) / (1000 * 60 * 60);
       
       const pricing = (order.mode || roomOrderForm.mode) === 'single' ? room.pricing_single : room.pricing_multiplayer;
       const roomCost = order.is_open_time ? durationHours * pricing : order.total_amount;
@@ -208,12 +218,12 @@ const CurrentOrders = () => {
       }));
 
       // Update order - if forced complete or if it's an open time session, complete it
-      const newStatus = forceComplete || order.is_open_time ? 'completed' : 'active';
+      const newStatus = forceComplete || order.is_open_time ? 'completed' : 'paused';
       
       await dispatch(editOrder({
         id: order.id,
         updates: {
-          end_time: endTime,
+          end_time: formattedEndTime,
           total_amount: totalCost,
           status: newStatus
         }
@@ -265,6 +275,11 @@ const CurrentOrders = () => {
       }
 
       const startTime = new Date().toISOString();
+      const formattedStartTime = new Date().toLocaleTimeString('en-US', { 
+        hour12: false, 
+        hour: '2-digit', 
+        minute: '2-digit' 
+      });
       let endTime = null;
       
       if (!reactivateForm.is_open_time) {
@@ -290,7 +305,7 @@ const CurrentOrders = () => {
       await dispatch(editOrder({
         id: selectedOrder.id,
         updates: {
-          start_time: startTime,
+          start_time: formattedStartTime,
           end_time: endTime,
           status: 'active'
         }
@@ -430,7 +445,7 @@ const CurrentOrders = () => {
         order_type: 'room_reservation' as const,
         room_id: roomOrderForm.room_id,
         total_amount: estimatedCost,
-        status: 'active' as const,
+        status: 'paused' as const,
         mode: roomOrderForm.mode,
         is_open_time: roomOrderForm.is_open_time,
         duration_hours: roomOrderForm.is_open_time ? null : roomOrderForm.duration_hours
@@ -573,6 +588,16 @@ const CurrentOrders = () => {
                       <div className="text-green-400 font-bold">
                         {order.is_open_time && isSessionActive ? 'Pay on Stop' : `${order.total_amount?.toFixed(2) || '0.00'} EGP`}
                       </div>
+                      {order.start_time && (
+                        <div className="text-sm text-gray-400">
+                          Started: {order.start_time}
+                        </div>
+                      )}
+                      {order.end_time && isPaused && (
+                        <div className="text-sm text-gray-400">
+                          Ended: {order.end_time}
+                        </div>
+                      )}
                     </div>
                   </div>
                 </CardHeader>

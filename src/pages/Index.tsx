@@ -2,7 +2,7 @@
 import { User } from '@supabase/supabase-js';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
-import { LogOutIcon, SettingsIcon, UsersIcon } from 'lucide-react';
+import { LogOutIcon, SettingsIcon, UsersIcon, CalendarIcon } from 'lucide-react';
 import AdminDashboard from '@/components/AdminDashboard';
 import CashierDashboard from '@/components/CashierDashboard';
 import Reports from '@/components/Reports';
@@ -43,7 +43,7 @@ const Index = ({ user, userProfile, onSignOut }: IndexProps) => {
         {/* Main Content */}
         {isAdmin ? (
           <Tabs defaultValue="admin" className="space-y-6">
-            <TabsList className="grid w-full grid-cols-3 bg-slate-800 border-0 max-w-lg">
+            <TabsList className="grid w-full grid-cols-4 bg-slate-800 border-0 max-w-2xl">
               <TabsTrigger value="admin" className="data-[state=active]:bg-blue-600 text-white">
                 <SettingsIcon className="w-4 h-4 mr-2" />
                 Admin Panel
@@ -53,6 +53,7 @@ const Index = ({ user, userProfile, onSignOut }: IndexProps) => {
                 Users
               </TabsTrigger>
               <TabsTrigger value="reports" className="data-[state=active]:bg-blue-600 text-white">
+                <CalendarIcon className="w-4 h-4 mr-2" />
                 Reports
               </TabsTrigger>
             </TabsList>

@@ -25,9 +25,18 @@ const AppointmentAlarm = () => {
           return;
         }
 
+        // Create proper datetime object for comparison
         const appointmentDateTime = new Date(`${appointment.appointment_date}T${appointment.appointment_time}`);
         const appointmentTime = appointmentDateTime.getTime();
         const timeDifference = appointmentTime - currentTime;
+        
+        console.log('Checking appointment:', {
+          id: appointment.id,
+          customer: appointment.customer_name,
+          dateTime: appointmentDateTime,
+          timeDifference: timeDifference / (1000 * 60), // in minutes
+          shouldAlarm: timeDifference > 0 && timeDifference <= 15 * 60 * 1000
+        });
         
         // Check if appointment is in the next 15 minutes
         if (timeDifference > 0 && timeDifference <= 15 * 60 * 1000) {
@@ -36,15 +45,16 @@ const AppointmentAlarm = () => {
           
           // Play alarm sound (if browser supports it)
           try {
-            const audio = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJeVkVHBhIqFbF1fdJeVkVHBhIqFbF1fdJeVkVHBhIqFbF1fdJeVkVHBhIqFbF1fdJeVkVHBhIqFbF1fdJeVkVHBhIqFbF1fdJeVkVHBhIqFbF1fdJeVkVHBhIqFbF1fdJeVkVHBhIqFbF1fdJeVkVHBhIqFbF1fdJeVkVHBhIqFbF1fdJeVkVHBhIqFbF1fdJeVkVHBhIqFbF1fdJeVkVHBhIqFbF1fdJeVkVHBhIqFbF1fdJeVkVHBhIqFbF1fdJeVkVHBhIqFbF1fdJeVkVHBhIqFbF1fdJeVkVHBhIqFbF1fdJeVkVHBhIqFbF1fdJeVkVHBhIqFbF1fdJeVkVHBhIqFbF1fdJeVkVHBhIqFbF1fdJeVkVHBhIqFbF1fdJeVkVHBhIqFbF1fdJeVkVHBhIqFbF1fdJeVkVHBhIqFbF1fdJeVkVHBhIqFbF1fdJeVkVHBhIqFbF1fdJeVkVHBhIqFbF1fdJeVkVHBhIqFbF1fdJeVkVHBhIqFbF1fdJeVkVHBhIqFbF1fdJeVkVHBhIqFbF1fdJeVkVHBhIqFbF1fdJeVkVHBhIqFbF1fdJeVkVHBhIqFbF1fdJeVkVHBhIqFbF1fdJeVkVHBhIqFbF1fdJeVkVHBhIqFbF1fdJeVkVHBhIqFbF1fdJeVkVHBhIqFbF1fdJeVkVHBhIqFbF1fdJeVkVHBhIqFbF1fdJeVkVHBhIqFbF1fdJeVkVHBhIqFbF1fdJeVkVHBhIqFbF1fdJeVkVHBhIqFbF1fdJeVkVHBhIqFbF1fdJeVkVHBhIqFbF1fdJeVkVHBhIqFbF1fdJeVkVHBhIqFbF1fdJeVkVHBhIqFbF1fdJeVkVHBhIqFbF1fdJeVkVHBhIqFbF1fdJeVkVHBhIqFbF1fdJeVkVHBhIqFbF1fdJeVkVHBhIqFbF1fdJeVkVHBhIqFbF1fdJeVkVHBhIqFbF1fdJeVkVHBhIqFbF1fdJeVkVHBhIqFbF1fdJeVkVHBhIqFbF1fdJeVkVHBhIqFbF1fdJeVkVHBhIqFbF1fdJeVkVHBhIqFbF1fdJeVkVHBhIqFbF1fdJeVkVHBhIqFbF1fdJeVkVHBhIqFbF1fdJeVkVHBhIqFbF1fdJeVkVHBhIqFbF1fdJeVkVHBhIqFbF1fdJeVkVHBhIqFbF1fdJeVkVHBhIqFbF1fdJeVkVHBhIqFbF1fdJeVkVHBhIqFbF1fdJeVkVHBhIqFbF1fdJeVkVHBhIqFbF1fdJeVkVHBhIqFbF1fdJeVkVHBhIqFbF1fdJeVkVHBhIqFbF1fdJeVkVHBhIqFbF1fdJeVkVHBhIqFbF1fdJeVkVHB');
+            const audio = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJeVkVHBhIqFbF1fdJeVkVHBhIqFbF1fdJeVkVHBhIqFbF1fdJeVkVHBhIqFbF1fdJeVkVHBhIqFbF1fdJeVkVHBhIqFbF1fdJeVkVHBhIqFbF1fdJeVkVHBhIqFbF1fdJeVkVHBhIqFbF1fdJeVkVHBhIqFbF1fdJeVkVHBhIqFbF1fdJeVkVHBhIqFbF1fdJeVkVHBhIqFbF1fdJeVkVHBhIqFbF1fdJeVkVHBhIqFbF1fdJeVkVHBhIqFbF1fdJeVkVHBhIqFbF1fdJeVkVHBhIqFbF1fdJeVkVHBhIqFbF1fdJeVkVHBhIqFbF1fdJeVkVHBhIqFbF1fdJeVkVHBhIqFbF1fdJeVkVHBhIqFbF1fdJeVkVHBhIqFbF1fdJeVkVHBhIqFbF1fdJeVkVHBhIqFbF1fdJeVkVHBhIqFbF1fdJeVkVHBhIqFbF1fdJeVkVHBhIqFbF1fdJeVkVHBhIqFbF1fdJeVkVHBhIqFbF1fdJeVkVHBhIqFbF1fdJeVkVHBhIqFbF1fdJeVkVHBhIqFbF1fdJeVkVHBhIqFbF1fdJeVkVHBhIqFbF1fdJeVkVHBhIqFbF1fdJeVkVHBhIqFbF1fdJeVkVHBhIqFbF1fdJeVkVHBhIqFbF1fdJeVkVHBhIqFbF1fdJeVkVHBhIqFbF1fdJeVkVHBhIqFbF1fdJeVkVHBhIqFbF1fdJeVkVHBhIqFbF1fdJeVkVHBhIqFbF1fdJeVkVHBhIqFbF1fdJeVkVHBhIqFbF1fdJeVkVHBhIqFbF1fdJeVkVHBhIqFbF1fdJeVkVHBhIqFbF1fdJeVkVHBhIqFbF1fdJeVkVHBhIqFbF1fdJeVkVHBhIqFbF1fdJeVkVHBhIqFbF1fdJeVkVHBhIqFbF1fdJeVkVHBhIqFbF1fdJeVkVHBhIqFbF1fdJeVkVHBhIqFbF1fdJeVkVHBhIqFbF1fdJeVkVHBhIqFbF1fdJeVkVHBhIqFbF1fdJeVkVHBhIqFbF1fdJeVkVHBhIqFbF1fdJeVkVHBhIqFbF1fdJeVkVHBhIqFbF1fdJeVkVHBhIqFbF1fdJeVkVHBhIqFbF1fdJeVkVHBhIqFbF1fdJeVkVHBhIqFbF1fdJeVkVHBhIqFbF1fdJeVkVHBhIqFbF1fdJeVkVHBhIqFbF1fdJeVkVHBhIqFbF1fdJeVkVHBhIqFbF1fdJeVkVHBhIqFbF1fdJeVkVHBhIqFbF1fdJeVkVHBhIqFbF1fdJeVkVHBhIqFbF1fdJeVkVHBhIqFbF1fdJeVkVHBhIqFbF1fdJeVkVHBhIqFbF1fdJeVkVHBhIqFbF1fdJeVkVHBhIqFbF1fdJeVkVHBhIqFbF1fdJeVkVHBhIqFbF1fdJeVkVHBhIqFbF1fdJeVkVHBhIqFbF1fdJeVkVHBhIqFbF1fdJeVkVHB');
             audio.play();
           } catch (error) {
             console.log('Could not play alarm sound');
           }
 
+          const minutesToAlarm = Math.ceil(timeDifference / (60 * 1000));
           toast({
             title: "Appointment Reminder",
-            description: `${appointment.customer_name} has an appointment in ${Math.ceil(timeDifference / (60 * 1000))} minutes`,
+            description: `${appointment.customer_name} has an appointment in ${minutesToAlarm} minutes`,
             duration: 10000,
           });
 
@@ -53,30 +63,40 @@ const AppointmentAlarm = () => {
       });
     };
 
+    // Check immediately
+    checkAppointments();
+    
     // Check every minute
     const interval = setInterval(checkAppointments, 60000);
-    
-    // Initial check
-    checkAppointments();
 
     return () => clearInterval(interval);
   }, [appointments, checkedAppointments, toast]);
 
   const formatTime = (timeString: string) => {
-    return new Date(`2000-01-01T${timeString}`).toLocaleTimeString('en-US', {
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: true
-    });
+    try {
+      const time = new Date(`2000-01-01T${timeString}`);
+      return time.toLocaleTimeString('en-US', {
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: true
+      });
+    } catch (error) {
+      return timeString;
+    }
   };
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
-      weekday: 'long',
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric'
-    });
+    try {
+      const date = new Date(dateString);
+      return date.toLocaleDateString('en-US', {
+        weekday: 'long',
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
+      });
+    } catch (error) {
+      return dateString;
+    }
   };
 
   const dismissAlarm = () => {

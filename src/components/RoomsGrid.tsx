@@ -1,8 +1,9 @@
+
 import { useState, useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { RootState, AppDispatch } from '@/store/store';
 import { fetchRooms, editRoom } from '@/store/slices/roomsSlice';
-import { editOrder } from '@/store/slices/ordersSlice';
+import { editOrder, fetchOrders } from '@/store/slices/ordersSlice';
 import RoomCard from '@/components/RoomCard';
 import BookingModal from '@/components/BookingModal';
 import { Room } from '@/services/supabaseService';
@@ -18,6 +19,7 @@ const RoomsGrid = () => {
 
   useEffect(() => {
     dispatch(fetchRooms());
+    dispatch(fetchOrders());
   }, [dispatch]);
 
   const handleBookRoom = async (roomId: string, customerName: string, hours: number, mode: 'single' | 'multiplayer') => {
@@ -58,6 +60,72 @@ const RoomsGrid = () => {
     }
   };
 
+  const handleStartSession = async (roomId: string) => {
+    try {
+      // Find the paused order for this room
+      const pausedOrder = orders.find(order => 
+        order.room_id === roomId && 
+        order.status === 'paused'
+      );
+
+      if (!pausedOrder) {
+        toast({
+          title: "Error",
+          description: "No paused session found for this room",
+          variant: "destructive",
+          duration: 3000,
+        });
+        return;
+      }
+
+      const room = rooms.find(r => r.id === roomId);
+      if (!room) return;
+
+      const startTime = new Date().toISOString();
+      const formattedStartTime = new Date().toLocaleTimeString('en-US', { 
+        hour12: false, 
+        hour: '2-digit', 
+        minute: '2-digit' 
+      });
+
+      // Update room to occupied
+      await dispatch(editRoom({
+        id: roomId,
+        updates: {
+          status: 'occupied',
+          current_customer_name: pausedOrder.customer_name,
+          current_mode: pausedOrder.mode || 'single',
+          current_session_start: startTime,
+          current_session_end: null, // Will be set based on session type
+          current_total_cost: pausedOrder.total_amount
+        }
+      }));
+
+      // Update order to active and record start time
+      await dispatch(editOrder({
+        id: pausedOrder.id,
+        updates: {
+          status: 'active',
+          start_time: formattedStartTime
+        }
+      }));
+
+      toast({
+        title: "Session Started",
+        description: `Room ${room.name} session resumed for ${pausedOrder.customer_name}`,
+        duration: 5000,
+      });
+    } catch (error) {
+      console.error('Error starting session:', error);
+      toast({
+        title: "Error",
+        description: "Failed to start session",
+        variant: "destructive",
+        duration: 3000,
+      });
+    }
+  };
+
   const handleEndSession = async (roomId: string) => {
     try {
       const room = rooms.find(r => r.id === roomId);
@@ -67,10 +135,16 @@ const RoomsGrid = () => {
       }
 
       const endTime = new Date();
+      const formattedEndTime = endTime.toLocaleTimeString('en-US', { 
+        hour12: false, 
+        hour: '2-digit', 
+        minute: '2-digit' 
+      });
+      
       const startTime = new Date(room.current_session_start);
       const elapsedHours = (endTime.getTime() - startTime.getTime()) / (1000 * 60 * 60);
       
-      // Calculate cost based on elapsed time
+      // Calculate cost based on actual elapsed time
       const hourlyRate = room.current_mode === 'single' ? room.pricing_single : room.pricing_multiplayer;
       const calculatedCost = elapsedHours * hourlyRate;
 
@@ -81,7 +155,7 @@ const RoomsGrid = () => {
         order.customer_name === room.current_customer_name
       );
 
-      // Update room status but keep the session data for potential reactivation
+      // Update room status to available
       await dispatch(editRoom({
         id: roomId,
         updates: {
@@ -94,14 +168,14 @@ const RoomsGrid = () => {
         }
       }));
 
-      // Update order status to 'paused' instead of completed so it stays in current orders
+      // Update order status to 'paused' and record end time and calculated cost
       if (activeOrder) {
         await dispatch(editOrder({
           id: activeOrder.id,
           updates: {
             status: 'paused',
             total_amount: calculatedCost,
-            end_time: endTime.toISOString()
+            end_time: formattedEndTime
           }
         }));
       }
@@ -110,7 +184,7 @@ const RoomsGrid = () => {
       
       toast({
         title: "Session Paused",
-        description: `Session moved to Current Orders for potential reactivation. Cost: ${calculatedCost.toFixed(2)} EGP`,
+        description: `Session moved to Current Orders. Elapsed time: ${elapsedHours.toFixed(2)} hours, Cost: ${calculatedCost.toFixed(2)} EGP`,
         duration: 5000,
       });
     } catch (error) {
@@ -171,15 +245,25 @@ const RoomsGrid = () => {
   return (
     <>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-        {rooms.map((room) => (
-          <RoomCard
-            key={room.id}
-            room={room}
-            onClick={() => handleRoomClick(room)}
-            onEndSession={() => handleEndSession(room.id)}
-            onAdjustTime={handleAdjustTime}
-          />
-        ))}
+        {rooms.map((room) => {
+          // Check if there's a paused order for this room
+          const pausedOrder = orders.find(order => 
+            order.room_id === room.id && 
+            order.status === 'paused'
+          );
+
+          return (
+            <RoomCard
+              key={room.id}
+              room={room}
+              onClick={() => handleRoomClick(room)}
+              onEndSession={() => handleEndSession(room.id)}
+              onAdjustTime={handleAdjustTime}
+              onStartSession={pausedOrder ? () => handleStartSession(room.id) : undefined}
+              showStartButton={!!pausedOrder && room.status === 'available'}
+            />
+          );
+        })}
       </div>
 
       <BookingModal
