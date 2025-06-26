@@ -39,26 +39,29 @@ const RoomSchedule = () => {
   const getScheduleForRoom = (roomId: string) => {
     const schedule: { [key: string]: any } = {};
     
-    // Add appointments
+    // Add appointments for the selected date
     appointments.forEach((appointment: any) => {
       if (appointment.room_id === roomId && appointment.appointment_date === selectedDate) {
         const startTime = appointment.appointment_time.substring(0, 5);
-        const endTime = new Date(new Date(`2000-01-01T${appointment.appointment_time}:00`).getTime() + 
-          (appointment.duration_hours * 60 * 60 * 1000)).toTimeString().substring(0, 5);
+        const endHour = parseInt(appointment.appointment_time.substring(0, 2)) + appointment.duration_hours;
+        const endTime = `${endHour.toString().padStart(2, '0')}:${appointment.appointment_time.substring(3, 5)}`;
         
         schedule[startTime] = {
           type: 'appointment',
           customer: appointment.customer_name,
           status: appointment.status,
           duration: appointment.duration_hours,
-          endTime
+          endTime,
+          id: appointment.id
         };
       }
     });
 
-    // Add active sessions
+    // Add active sessions (only for today)
     const room = rooms.find(r => r.id === roomId);
-    if (room && room.status === 'occupied' && room.current_session_start) {
+    const today = new Date().toISOString().split('T')[0];
+    
+    if (room && room.status === 'occupied' && room.current_session_start && selectedDate === today) {
       const sessionStart = new Date(room.current_session_start);
       const startTime = sessionStart.toTimeString().substring(0, 5);
       const endTime = room.current_session_end ? 
@@ -70,23 +73,41 @@ const RoomSchedule = () => {
         customer: room.current_customer_name,
         status: 'active',
         mode: room.current_mode,
-        endTime
+        endTime,
+        id: `session-${room.id}`
       };
     }
+
+    // Add paused orders (sessions that can be resumed)
+    orders.forEach((order: any) => {
+      if (order.room_id === roomId && order.status === 'paused' && order.start_time && order.end_time) {
+        schedule[order.start_time] = {
+          type: 'paused_session',
+          customer: order.customer_name,
+          status: 'paused',
+          mode: order.mode,
+          endTime: order.end_time,
+          id: order.id
+        };
+      }
+    });
 
     return schedule;
   };
 
   const isTimeSlotOccupied = (roomId: string, timeSlot: string) => {
     const schedule = getScheduleForRoom(roomId);
+    const slotTime = new Date(`2000-01-01T${timeSlot}:00`);
     
     for (const [startTime, event] of Object.entries(schedule)) {
       const eventStartTime = new Date(`2000-01-01T${startTime}:00`);
-      const eventEndTime = event.endTime === 'Open' ? 
-        new Date(`2000-01-01T23:59:59`) : 
-        new Date(`2000-01-01T${event.endTime}:00`);
+      let eventEndTime;
       
-      const slotTime = new Date(`2000-01-01T${timeSlot}:00`);
+      if (event.endTime === 'Open') {
+        eventEndTime = new Date(`2000-01-01T23:59:59`);
+      } else {
+        eventEndTime = new Date(`2000-01-01T${event.endTime}:00`);
+      }
       
       if (slotTime >= eventStartTime && slotTime < eventEndTime) {
         return event;
@@ -99,11 +120,26 @@ const RoomSchedule = () => {
   const getEventColor = (event: any) => {
     switch (event.type) {
       case 'appointment':
-        return event.status === 'scheduled' ? 'bg-purple-600' : 'bg-purple-400';
+        return event.status === 'scheduled' ? 'bg-purple-600 text-white' : 'bg-purple-400 text-white';
       case 'session':
-        return 'bg-blue-600';
+        return 'bg-blue-600 text-white';
+      case 'paused_session':
+        return 'bg-orange-600 text-white';
       default:
-        return 'bg-gray-600';
+        return 'bg-gray-600 text-white';
+    }
+  };
+
+  const getEventLabel = (event: any) => {
+    switch (event.type) {
+      case 'appointment':
+        return 'APT';
+      case 'session':
+        return 'LIVE';
+      case 'paused_session':
+        return 'PAUSE';
+      default:
+        return 'OCC';
     }
   };
 
@@ -147,14 +183,21 @@ const RoomSchedule = () => {
                 <CardTitle className="text-white flex items-center gap-2">
                   {room.name} - {room.console_type}
                 </CardTitle>
-                <Badge className={
-                  room.status === 'available' ? 'bg-green-600' :
-                  room.status === 'occupied' ? 'bg-red-600' :
-                  room.status === 'cleaning' ? 'bg-yellow-600' :
-                  'bg-orange-600'
-                }>
-                  {room.status}
-                </Badge>
+                <div className="flex gap-2">
+                  <Badge className={
+                    room.status === 'available' ? 'bg-green-600' :
+                    room.status === 'occupied' ? 'bg-red-600' :
+                    room.status === 'cleaning' ? 'bg-yellow-600' :
+                    'bg-orange-600'
+                  }>
+                    {room.status}
+                  </Badge>
+                  {room.current_customer_name && (
+                    <Badge variant="outline" className="text-white border-white">
+                      {room.current_customer_name}
+                    </Badge>
+                  )}
+                </div>
               </div>
             </CardHeader>
             <CardContent>
@@ -165,21 +208,26 @@ const RoomSchedule = () => {
                     <div
                       key={timeSlot}
                       className={`
-                        p-2 rounded text-center relative
+                        p-2 rounded text-center relative min-h-[3rem] flex flex-col justify-center
                         ${event ? 
-                          `${getEventColor(event)} text-white` : 
-                          'bg-slate-700 text-gray-300 hover:bg-slate-600'
+                          `${getEventColor(event)}` : 
+                          'bg-slate-700 text-gray-300 hover:bg-slate-600 cursor-pointer'
                         }
                       `}
                       title={event ? 
-                        `${event.customer} (${event.type === 'appointment' ? 'Appointment' : 'Session'})` : 
-                        timeSlot
+                        `${event.customer} - ${event.type === 'appointment' ? 'Appointment' : event.type === 'session' ? 'Active Session' : 'Paused Session'} (${timeSlot} - ${event.endTime})` : 
+                        `Available - ${timeSlot}`
                       }
                     >
-                      {timeSlot}
+                      <div className="text-xs font-medium">{timeSlot}</div>
                       {event && (
-                        <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-50 rounded text-xs">
-                          {event.customer?.substring(0, 8)}
+                        <div className="text-xs font-bold">
+                          {getEventLabel(event)}
+                        </div>
+                      )}
+                      {event && event.customer && (
+                        <div className="text-xs truncate">
+                          {event.customer.substring(0, 6)}
                         </div>
                       )}
                     </div>
@@ -187,19 +235,48 @@ const RoomSchedule = () => {
                 })}
               </div>
               
-              {/* Legend */}
-              <div className="flex gap-4 mt-4 text-xs">
+              {/* Enhanced Legend */}
+              <div className="flex flex-wrap gap-4 mt-4 text-xs">
                 <div className="flex items-center gap-1">
                   <div className="w-3 h-3 bg-purple-600 rounded"></div>
                   <span className="text-gray-300">Appointment</span>
                 </div>
                 <div className="flex items-center gap-1">
                   <div className="w-3 h-3 bg-blue-600 rounded"></div>
-                  <span className="text-gray-300">Active Session</span>
+                  <span className="text-gray-300">Live Session</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <div className="w-3 h-3 bg-orange-600 rounded"></div>
+                  <span className="text-gray-300">Paused Session</span>
                 </div>
                 <div className="flex items-center gap-1">
                   <div className="w-3 h-3 bg-slate-700 rounded"></div>
                   <span className="text-gray-300">Available</span>
+                </div>
+              </div>
+
+              {/* Room Statistics */}
+              <div className="mt-4 p-3 bg-slate-700 rounded-lg">
+                <div className="text-sm text-gray-300 mb-2">Today's Schedule Summary:</div>
+                <div className="grid grid-cols-3 gap-4 text-xs">
+                  <div>
+                    <span className="text-purple-400">Appointments: </span>
+                    <span className="text-white">
+                      {appointments.filter(apt => apt.room_id === room.id && apt.appointment_date === selectedDate).length}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-blue-400">Active: </span>
+                    <span className="text-white">
+                      {room.status === 'occupied' ? '1' : '0'}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-orange-400">Paused: </span>
+                    <span className="text-white">
+                      {orders.filter(order => order.room_id === room.id && order.status === 'paused').length}
+                    </span>
+                  </div>
                 </div>
               </div>
             </CardContent>

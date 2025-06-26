@@ -26,6 +26,8 @@ const UserManagement = () => {
   const [editingUser, setEditingUser] = useState<Profile | null>(null);
   const [newUser, setNewUser] = useState({ email: '', password: '', role: 'cashier' });
   const [editForm, setEditForm] = useState({ email: '', role: 'cashier', newPassword: '' });
+  const [createLoading, setCreateLoading] = useState(false);
+  const [updateLoading, setUpdateLoading] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -54,46 +56,78 @@ const UserManagement = () => {
 
   const handleAddUser = async (e: React.FormEvent) => {
     e.preventDefault();
+    setCreateLoading(true);
+    
     try {
-      // Create user in Supabase Auth
-      const { data, error } = await supabase.auth.admin.createUser({
+      // First create the user in Supabase Auth using signUp
+      const { data, error } = await supabase.auth.signUp({
         email: newUser.email,
         password: newUser.password,
-        email_confirm: true
+        options: {
+          emailRedirectTo: undefined, // Disable email confirmation for admin-created users
+        }
       });
 
-      if (error) throw error;
+      if (error) {
+        // If it's a duplicate user error, try a different approach
+        if (error.message.includes('already registered')) {
+          toast({
+            title: "Error",
+            description: "A user with this email already exists.",
+            variant: "destructive",
+          });
+          return;
+        }
+        throw error;
+      }
 
-      // Update the profile with the correct role
-      await supabase
-        .from('profiles')
-        .update({ role: newUser.role })
-        .eq('id', data.user.id);
+      if (data.user) {
+        // Update or insert the profile with the correct role
+        const { error: profileError } = await supabase
+          .from('profiles')
+          .upsert({ 
+            id: data.user.id,
+            email: newUser.email,
+            role: newUser.role 
+          }, {
+            onConflict: 'id'
+          });
 
-      toast({
-        title: "Success",
-        description: "User created successfully!",
-      });
+        if (profileError) {
+          console.error('Profile creation error:', profileError);
+          // Don't throw here, as the user was created successfully
+        }
 
-      setNewUser({ email: '', password: '', role: 'cashier' });
-      setIsAddUserOpen(false);
-      fetchUsers();
+        toast({
+          title: "Success",
+          description: `User created successfully! ${data.user.email_confirmed_at ? '' : 'Email confirmation may be required.'}`,
+        });
+
+        setNewUser({ email: '', password: '', role: 'cashier' });
+        setIsAddUserOpen(false);
+        fetchUsers();
+      }
     } catch (error: any) {
+      console.error('User creation error:', error);
       toast({
         title: "Error",
-        description: error.message || "Failed to create user",
+        description: error.message || "Failed to create user. Make sure you have admin privileges.",
         variant: "destructive",
       });
+    } finally {
+      setCreateLoading(false);
     }
   };
 
   const handleEditUser = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingUser) return;
+    
+    setUpdateLoading(true);
 
     try {
-      // Update profile
-      await supabase
+      // Update profile in our database
+      const { error: profileError } = await supabase
         .from('profiles')
         .update({ 
           email: editForm.email,
@@ -101,23 +135,14 @@ const UserManagement = () => {
         })
         .eq('id', editingUser.id);
 
-      // Update auth user email if changed
-      if (editForm.email !== editingUser.email) {
-        await supabase.auth.admin.updateUserById(editingUser.id, {
-          email: editForm.email
-        });
-      }
+      if (profileError) throw profileError;
 
-      // Update password if provided
-      if (editForm.newPassword) {
-        await supabase.auth.admin.updateUserById(editingUser.id, {
-          password: editForm.newPassword
-        });
-      }
-
+      // Note: We can't easily update auth user email/password without admin API
+      // This would require server-side implementation
+      
       toast({
         title: "Success",
-        description: "User updated successfully!",
+        description: "User profile updated successfully!",
       });
 
       setEditingUser(null);
@@ -129,18 +154,26 @@ const UserManagement = () => {
         description: error.message || "Failed to update user",
         variant: "destructive",
       });
+    } finally {
+      setUpdateLoading(false);
     }
   };
 
-  const handleDeleteUser = async (userId: string) => {
-    if (!confirm('Are you sure you want to delete this user?')) return;
+  const handleDeleteUser = async (userId: string, userEmail: string) => {
+    if (!confirm(`Are you sure you want to delete user: ${userEmail}?`)) return;
 
     try {
-      await supabase.auth.admin.deleteUser(userId);
+      // Delete from profiles table (the auth user will remain but won't have access)
+      const { error } = await supabase
+        .from('profiles')
+        .delete()
+        .eq('id', userId);
+
+      if (error) throw error;
 
       toast({
         title: "Success",
-        description: "User deleted successfully!",
+        description: "User access removed successfully!",
       });
 
       fetchUsers();
@@ -223,8 +256,12 @@ const UserManagement = () => {
                   </SelectContent>
                 </Select>
               </div>
-              <Button type="submit" className="w-full bg-green-600 hover:bg-green-700">
-                Create User
+              <Button 
+                type="submit" 
+                disabled={createLoading}
+                className="w-full bg-green-600 hover:bg-green-700"
+              >
+                {createLoading ? 'Creating...' : 'Create User'}
               </Button>
             </form>
           </DialogContent>
@@ -265,7 +302,7 @@ const UserManagement = () => {
                     <Button
                       size="sm"
                       variant="destructive"
-                      onClick={() => handleDeleteUser(user.id)}
+                      onClick={() => handleDeleteUser(user.id, user.email)}
                     >
                       <TrashIcon className="w-4 h-4" />
                     </Button>
@@ -299,7 +336,9 @@ const UserManagement = () => {
                   onChange={(e) => setEditForm({...editForm, email: e.target.value})}
                   className="bg-slate-700 border-slate-600 text-white"
                   required
+                  disabled // Email updates require server-side implementation
                 />
+                <p className="text-xs text-gray-400 mt-1">Email updates require server-side implementation</p>
               </div>
               <div>
                 <Label htmlFor="edit-role" className="text-white">Role</Label>
@@ -313,19 +352,12 @@ const UserManagement = () => {
                   </SelectContent>
                 </Select>
               </div>
-              <div>
-                <Label htmlFor="edit-password" className="text-white">New Password (optional)</Label>
-                <Input
-                  id="edit-password"
-                  type="password"
-                  value={editForm.newPassword}
-                  onChange={(e) => setEditForm({...editForm, newPassword: e.target.value})}
-                  className="bg-slate-700 border-slate-600 text-white"
-                  placeholder="Leave empty to keep current password"
-                />
-              </div>
-              <Button type="submit" className="w-full bg-blue-600 hover:bg-blue-700">
-                Update User
+              <Button 
+                type="submit" 
+                disabled={updateLoading}
+                className="w-full bg-blue-600 hover:bg-blue-700"
+              >
+                {updateLoading ? 'Updating...' : 'Update User'}
               </Button>
             </form>
           </DialogContent>

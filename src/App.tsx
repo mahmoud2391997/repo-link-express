@@ -25,10 +25,54 @@ const App = () => {
   const [user, setUser] = useState<User | null>(null);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
+  const [authInitialized, setAuthInitialized] = useState(false);
 
   useEffect(() => {
+    let isMounted = true;
+
+    const initializeAuth = async () => {
+      try {
+        // Get initial session
+        const { data: { session: initialSession } } = await supabase.auth.getSession();
+        
+        if (!isMounted) return;
+
+        if (initialSession?.user) {
+          setSession(initialSession);
+          setUser(initialSession.user);
+          
+          // Fetch user profile
+          try {
+            const { data: profile, error } = await supabase
+              .from('profiles')
+              .select('*')
+              .eq('id', initialSession.user.id)
+              .single();
+            
+            if (!error && profile && isMounted) {
+              setUserProfile(profile);
+            }
+          } catch (profileError) {
+            console.error('Error fetching initial profile:', profileError);
+          }
+        }
+      } catch (error) {
+        console.error('Error initializing auth:', error);
+      } finally {
+        if (isMounted) {
+          setLoading(false);
+          setAuthInitialized(true);
+        }
+      }
+    };
+
+    // Set up auth state listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
+        if (!isMounted) return;
+
+        console.log('Auth state changed:', event, session?.user?.email);
+        
         setSession(session);
         setUser(session?.user ?? null);
         
@@ -40,78 +84,89 @@ const App = () => {
               .eq('id', session.user.id)
               .single();
             
-            setUserProfile(profile);
+            if (isMounted) {
+              setUserProfile(profile);
+            }
           } catch (error) {
             console.error('Error fetching user profile:', error);
+            if (isMounted) {
+              setUserProfile(null);
+            }
           }
         } else {
-          setUserProfile(null);
+          if (isMounted) {
+            setUserProfile(null);
+          }
         }
         
-        setLoading(false);
+        if (isMounted && authInitialized) {
+          setLoading(false);
+        }
       }
     );
 
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      console.log(session?.user);
+    initializeAuth();
+
+    return () => {
+      isMounted = false;
+      subscription.unsubscribe();
+    };
+  }, [authInitialized]);
+
+  const handleAuthSuccess = async () => {
+    setLoading(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
       
       if (session?.user) {
-        supabase
+        setSession(session);
+        setUser(session.user);
+        
+        const { data: profile } = await supabase
           .from('profiles')
           .select('*')
           .eq('id', session.user.id)
-          .single()
-          .then(({ data: profile }) => {
-            setUserProfile(profile);
-            setLoading(false);
-          });
-      } else {
-        setLoading(false);
+          .single();
+        
+        setUserProfile(profile);
       }
-    });
-
-    return () => subscription.unsubscribe();
-  }, []);
-
-  const handleAuthSuccess = () => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      
-      if (session?.user) {
-        supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', session.user.id)
-          .single()
-          .then(({ data: profile }) => {
-            setUserProfile(profile);
-          });
-      }
-    });
+    } catch (error) {
+      console.error('Error in handleAuthSuccess:', error);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleSignOut = async () => {
     try {
+      setLoading(true);
       await supabase.auth.signOut();
       setSession(null);
       setUser(null);
       setUserProfile(null);
+      
+      // Clear any cached credentials
+      sessionStorage.removeItem('gaming_center_credentials');
     } catch (error) {
       console.error('Error signing out:', error);
+    } finally {
+      setLoading(false);
     }
   };
 
+  // Show loading spinner
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-900 via-slate-900 to-black flex items-center justify-center">
-        <div className="text-white text-xl">Loading...</div>
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
+          <div className="text-white text-xl">Loading...</div>
+        </div>
       </div>
     );
   }
 
+  // Show auth page if not authenticated
   if (!session || !user || !userProfile) {
     return (
       <QueryClientProvider client={queryClient}>
@@ -124,6 +179,7 @@ const App = () => {
     );
   }
 
+  // Show main app
   return (
     <QueryClientProvider client={queryClient}>
       <ReduxProvider>
