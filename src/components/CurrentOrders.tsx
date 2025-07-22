@@ -12,7 +12,7 @@ import { fetchOrders, editOrder, addOrder } from '@/store/slices/ordersSlice';
 import { fetchRooms, editRoom } from '@/store/slices/roomsSlice';
 import { fetchCafeProducts } from '@/store/slices/cafeProductsSlice';
 import { RootState, AppDispatch } from '@/store/store';
-import { createOrderItem, createTransaction } from '@/services/supabaseService';
+import { createOrderItem, createTransaction } from "@/services/dbService";
 import { useToast } from '@/hooks/use-toast';
 import CafeCartProcessor from '@/components/CafeCartProcessor';
 

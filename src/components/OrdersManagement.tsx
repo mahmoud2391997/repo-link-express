@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { PlusIcon, EditIcon, TrashIcon, ShoppingCartIcon, DollarSignIcon } from 'lucide-react';
-import { getOrders, updateOrder, deleteOrder, getOrderItems, updateOrderItem, deleteOrderItem } from '@/services/supabaseService';
+import { getOrders, updateOrder, deleteOrder, getOrderItems, updateOrderItem, deleteOrderItem } from "@/services/dbService";
 import { useToast } from '@/hooks/use-toast';
 
 const OrdersManagement = () => {

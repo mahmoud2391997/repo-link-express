@@ -6,7 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { DollarSignIcon, FilterIcon, CreditCardIcon, BanknoteIcon, SmartphoneIcon, TrashIcon } from 'lucide-react';
-import { getTransactions, deleteTransaction } from '@/services/supabaseService';
+import { getTransactions, deleteTransaction } from "@/services/dbService";
 import { useToast } from '@/hooks/use-toast';
 
 interface TransactionsManagementProps {

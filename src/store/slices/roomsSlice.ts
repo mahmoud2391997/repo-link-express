@@ -1,6 +1,6 @@
 
 import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit';
-import { Room, getRooms, createRoom, updateRoom, deleteRoom } from '@/services/supabaseService';
+import { Room, getRooms, createRoom, updateRoom, deleteRoom } from "@/services/dbService";
 
 interface RoomsState {
   rooms: Room[];

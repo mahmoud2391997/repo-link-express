@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { BarChart3Icon, DollarSignIcon, TrendingUpIcon, UsersIcon } from 'lucide-react';
-import { getReportData } from '@/services/supabaseService';
+import { getReportData } from "@/services/dbService";
 
 const Reports = () => {
   const [period, setPeriod] = useState<'daily' | 'weekly' | 'monthly' | 'quarterly' | 'half-yearly' | 'yearly'>('daily');

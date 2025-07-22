@@ -1,6 +1,6 @@
 
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
-import { Appointment, getAppointments, createAppointment, updateAppointment, deleteAppointment } from '@/services/supabaseService';
+import { Appointment, getAppointments, createAppointment, updateAppointment, deleteAppointment } from '@/services/dbService';
 
 interface AppointmentsState {
   appointments: any[];

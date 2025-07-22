@@ -1,6 +1,6 @@
 
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
-import { CafeProduct, getCafeProducts, createCafeProduct, updateCafeProduct, deleteCafeProduct } from '@/services/supabaseService';
+import { CafeProduct, getCafeProducts, createCafeProduct, updateCafeProduct, deleteCafeProduct } from "@/services/dbService";
 
 interface CafeProductsState {
   products: CafeProduct[];

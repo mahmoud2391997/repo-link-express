@@ -1,6 +1,6 @@
 
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
-import { Transaction, getTransactions, createTransaction, deleteTransaction } from '@/services/supabaseService';
+import { Transaction, getTransactions, createTransaction, deleteTransaction } from "@/services/dbService";
 
 interface TransactionsState {
   transactions: any[];

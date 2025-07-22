@@ -1,5 +1,3 @@
-
-import { User } from '@supabase/supabase-js';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { LogOutIcon, SettingsIcon, UsersIcon, CalendarIcon } from 'lucide-react';
@@ -8,20 +6,10 @@ import CashierDashboard from '@/components/CashierDashboard';
 import Reports from '@/components/Reports';
 import UserEmailManagement from '@/components/UserEmailManagement';
 
-interface UserProfile {
-  id: string;
-  email: string;
-  role: string;
-}
-
-interface IndexProps {
-  user: User;
-  userProfile: UserProfile;
-  onSignOut: () => void;
-}
-
-const Index = ({ user, userProfile, onSignOut }: IndexProps) => {
-  const isAdmin = userProfile.role === 'admin';
+const Index = () => {
+  // For a local desktop application, we can assume admin privileges or simplify the UI.
+  // For now, we'll directly render the CashierDashboard.
+  // If admin functionality is still desired, it would need a local authentication mechanism.
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-slate-900 to-black">
@@ -31,51 +19,18 @@ const Index = ({ user, userProfile, onSignOut }: IndexProps) => {
           <div>
             <h1 className="text-3xl font-bold text-white">Zone 14 Gaming Center</h1>
             <p className="text-gray-400">
-              Welcome back, {user.email} ({userProfile.role})
+              Welcome to the desktop application.
             </p>
           </div>
-          <Button onClick={onSignOut} variant="outline" className="text-white border-white hover:bg-white hover:text-black">
-            <LogOutIcon className="w-4 h-4 mr-2" />
-            Sign Out
-          </Button>
         </div>
 
         {/* Main Content */}
-        {isAdmin ? (
-          <Tabs defaultValue="admin" className="space-y-6">
-            <TabsList className="grid w-full grid-cols-4 bg-slate-800 border-0 max-w-2xl">
-              <TabsTrigger value="admin" className="data-[state=active]:bg-blue-600 text-white">
-                <SettingsIcon className="w-4 h-4 mr-2" />
-                Admin Panel
-              </TabsTrigger>
-              <TabsTrigger value="users" className="data-[state=active]:bg-blue-600 text-white">
-                <UsersIcon className="w-4 h-4 mr-2" />
-                Users
-              </TabsTrigger>
-              <TabsTrigger value="reports" className="data-[state=active]:bg-blue-600 text-white">
-                <CalendarIcon className="w-4 h-4 mr-2" />
-                Reports
-              </TabsTrigger>
-            </TabsList>
-
-            <TabsContent value="admin">
-              <AdminDashboard />
-            </TabsContent>
-
-            <TabsContent value="users">
-              <UserEmailManagement />
-            </TabsContent>
-
-            <TabsContent value="reports">
-              <Reports />
-            </TabsContent>
-          </Tabs>
-        ) : (
-          <CashierDashboard />
-        )}
+        <CashierDashboard />
       </div>
     </div>
   );
 };
 
 export default Index;
+
+

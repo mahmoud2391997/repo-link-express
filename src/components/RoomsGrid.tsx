@@ -6,7 +6,7 @@ import { fetchRooms, editRoom } from '@/store/slices/roomsSlice';
 import { editOrder, fetchOrders } from '@/store/slices/ordersSlice';
 import RoomCard from '@/components/RoomCard';
 import BookingModal from '@/components/BookingModal';
-import { Room } from '@/services/supabaseService';
+import { Room } from "@/services/dbService";
 import { useToast } from '@/hooks/use-toast';
 
 const RoomsGrid = () => {

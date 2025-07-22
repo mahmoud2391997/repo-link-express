@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { GamepadIcon, ClockIcon, DollarSignIcon, UserIcon, UsersIcon, PlusIcon } from 'lucide-react';
-import { createOrder, createOrderItem, createTransaction, getCafeProducts, CafeProduct, Room } from '@/services/supabaseService';
+import { createOrder, createOrderItem, createTransaction, getCafeProducts, CafeProduct, Room } from "@/services/dbService";
 import { useToast } from '@/hooks/use-toast';
 
 interface BookingModalProps {

@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Switch } from '@/components/ui/switch';
 import { PlusIcon, EditIcon, TrashIcon, CoffeeIcon } from 'lucide-react';
-import { getCafeProducts, createCafeProduct, updateCafeProduct, deleteCafeProduct, CafeProduct } from '@/services/supabaseService';
+import { getCafeProducts, createCafeProduct, updateCafeProduct, deleteCafeProduct, CafeProduct } from "@/services/dbService";
 import { useToast } from '@/hooks/use-toast';
 import CafeCartProcessor from './CafeCartProcessor';
 

@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { CalendarIcon, ClockIcon } from 'lucide-react';
 import { Room } from '@/data/roomsData';
-import { createAppointment, Appointment } from '@/services/supabaseService';
+import { createAppointment, Appointment } from '@/services/dbService';
 import { useToast } from '@/hooks/use-toast';
 
 interface AppointmentModalProps {

@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { PlayIcon, StopCircleIcon, ClockIcon, UserIcon, GamepadIcon, PlusIcon, MinusIcon } from 'lucide-react';
-import { Room } from '@/services/supabaseService';
+import { Room } from "@/services/dbService";
 import { showSessionEndNotification } from '@/utils/notificationUtils';
 
 interface RoomCardProps {

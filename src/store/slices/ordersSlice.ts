@@ -1,6 +1,6 @@
 
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
-import { Order, getOrders, createOrder, updateOrder, deleteOrder } from '@/services/supabaseService';
+import { Order, getOrders, createOrder, updateOrder, deleteOrder } from "@/services/dbService";
 
 interface OrdersState {
   orders: any[];

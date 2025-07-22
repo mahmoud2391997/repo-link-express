@@ -1,5 +1,5 @@
-import { supabase } from '@/integrations/supabase/client';
-
+const localDbService = await import('./localDbService.js');
+const { db } = localDbService;
 export interface Room {
   id: string;
   name: string;
@@ -78,172 +78,148 @@ export interface CafeProduct {
 
 // Rooms CRUD Operations
 export const getRooms = async (): Promise<Room[]> => {
-  const { data, error } = await supabase.from('rooms').select('*').order('name');
-  if (error) throw error;
+  const data = await db('rooms').select('*').orderBy('name');
   return data as Room[];
 };
 
 export const createRoom = async (room: Omit<Room, 'created_at' | 'updated_at'>) => {
-  const { data, error } = await supabase.from('rooms').insert(room).select().single();
-  if (error) throw error;
+  const [data] = await db('rooms').insert(room).returning('*');
   return data as Room;
 };
 
 export const updateRoom = async (id: string, updates: Partial<Room>) => {
-  const { data, error } = await supabase.from('rooms').update(updates).eq('id', id).select().single();
-  if (error) throw error;
+  const [data] = await db('rooms').where({ id }).update(updates).returning('*');
   return data as Room;
 };
 
 export const deleteRoom = async (id: string) => {
-  const { error } = await supabase.from('rooms').delete().eq('id', id);
-  if (error) throw error;
+  await db('rooms').where({ id }).delete();
 };
 
 // Appointments CRUD Operations
 export const createAppointment = async (appointment: Omit<Appointment, 'id' | 'created_at' | 'updated_at'>) => {
-  const { data, error } = await supabase.from('appointments').insert(appointment).select().single();
-  if (error) throw error;
+  const [data] = await db('appointments').insert(appointment).returning('*');
   return data as Appointment;
 };
 
 export const getAppointments = async () => {
-  const { data, error } = await supabase.from('appointments').select(`
-    *,
-    rooms (name, console_type)
-  `).order('appointment_date', { ascending: true });
-  if (error) throw error;
+  const data = await db('appointments')
+    .select('appointments.*', 'rooms.name as room_name', 'rooms.console_type as room_console_type')
+    .leftJoin('rooms', 'appointments.room_id', 'rooms.id')
+    .orderBy('appointment_date', 'asc');
   return data;
 };
 
 export const updateAppointment = async (id: string, updates: Partial<Appointment>) => {
-  const { data, error } = await supabase.from('appointments').update(updates).eq('id', id).select().single();
-  if (error) throw error;
+  const [data] = await db('appointments').where({ id }).update(updates).returning('*');
   return data as Appointment;
 };
 
 export const deleteAppointment = async (id: string) => {
-  const { error } = await supabase.from('appointments').delete().eq('id', id);
-  if (error) throw error;
+  await db('appointments').where({ id }).delete();
 };
 
 // Orders CRUD Operations
 export const createOrder = async (order: Omit<Order, 'id' | 'created_at' | 'updated_at'>) => {
-  const { data, error } = await supabase.from('orders').insert(order).select().single();
-  if (error) throw error;
+  const [data] = await db('orders').insert(order).returning('*');
   return data as Order;
 };
 
 export const getOrders = async (status?: string) => {
-  let query = supabase.from('orders').select(`
-    *,
-    order_items (*),
-    transactions (*),
-    rooms (name, console_type)
-  `).order('created_at', { ascending: false });
+  let query = db('orders')
+    .select('orders.*', 'order_items.*', 'transactions.*', 'rooms.name as room_name', 'rooms.console_type as room_console_type')
+    .leftJoin('order_items', 'orders.id', 'order_items.order_id')
+    .leftJoin('transactions', 'orders.id', 'transactions.order_id')
+    .leftJoin('rooms', 'orders.room_id', 'rooms.id')
+    .orderBy('orders.created_at', 'desc');
   
   if (status) {
-    query = query.eq('status', status);
+    query = query.where('orders.status', status);
   }
   
-  const { data, error } = await query;
-  if (error) throw error;
+  const data = await query;
   return data;
 };
 
 export const updateOrder = async (id: string, updates: Partial<Order>) => {
-  const { data, error } = await supabase.from('orders').update(updates).eq('id', id).select().single();
-  if (error) throw error;
+  const [data] = await db('orders').where({ id }).update(updates).returning('*');
   return data as Order;
 };
 
 export const deleteOrder = async (id: string) => {
-  const { error } = await supabase.from('orders').delete().eq('id', id);
-  if (error) throw error;
+  await db('orders').where({ id }).delete();
 };
 
 // Order Items CRUD Operations
 export const createOrderItem = async (item: Omit<OrderItem, 'id' | 'created_at'>) => {
-  const { data, error } = await supabase.from('order_items').insert(item).select().single();
-  if (error) throw error;
+  const [data] = await db('order_items').insert(item).returning('*');
   return data as OrderItem;
 };
 
 export const getOrderItems = async (orderId: string) => {
-  const { data, error } = await supabase.from('order_items').select('*').eq('order_id', orderId);
-  if (error) throw error;
+  const data = await db('order_items').select('*').where({ order_id: orderId });
   return data as OrderItem[];
 };
 
 export const updateOrderItem = async (id: string, updates: Partial<OrderItem>) => {
-  const { data, error } = await supabase.from('order_items').update(updates).eq('id', id).select().single();
-  if (error) throw error;
+  const [data] = await db('order_items').where({ id }).update(updates).returning('*');
   return data as OrderItem;
 };
 
 export const deleteOrderItem = async (id: string) => {
-  const { error } = await supabase.from('order_items').delete().eq('id', id);
-  if (error) throw error;
+  await db('order_items').where({ id }).delete();
 };
 
 // Transactions CRUD Operations
 export const createTransaction = async (transaction: Omit<Transaction, 'id' | 'created_at'>) => {
-  const { data, error } = await supabase.from('transactions').insert(transaction).select().single();
-  if (error) throw error;
+  const [data] = await db('transactions').insert(transaction).returning('*');
   return data as Transaction;
 };
 
 export const getTransactions = async (startDate?: string, endDate?: string) => {
-  let query = supabase.from('transactions').select(`
-    *,
-    orders (*)
-  `).order('created_at', { ascending: false });
+  let query = db('transactions')
+    .select('transactions.*', 'orders.*')
+    .leftJoin('orders', 'transactions.order_id', 'orders.id')
+    .orderBy('transactions.created_at', 'desc');
   
   if (startDate) {
-    query = query.gte('created_at', startDate);
+    query = query.where('transactions.created_at', '>=', startDate);
   }
   if (endDate) {
-    query = query.lte('created_at', endDate);
+    query = query.where('transactions.created_at', '<=', endDate);
   }
   
-  const { data, error } = await query;
-  if (error) throw error;
+  const data = await query;
   return data;
 };
 
 export const updateTransaction = async (id: string, updates: Partial<Transaction>) => {
-  const { data, error } = await supabase.from('transactions').update(updates).eq('id', id).select().single();
-  if (error) throw error;
+  const [data] = await db('transactions').where({ id }).update(updates).returning('*');
   return data as Transaction;
 };
 
 export const deleteTransaction = async (id: string) => {
-  const { error } = await supabase.from('transactions').delete().eq('id', id);
-  if (error) throw error;
+  await db('transactions').where({ id }).delete();
 };
 
 // Cafe Products CRUD Operations
 export const getCafeProducts = async (): Promise<CafeProduct[]> => {
-  const { data, error } = await supabase.from('cafe_products').select('*').order('category');
-  if (error) throw error;
+  const data = await db('cafe_products').select('*').orderBy('category');
   return data as CafeProduct[];
 };
 
 export const createCafeProduct = async (product: Omit<CafeProduct, 'id' | 'created_at' | 'updated_at'>) => {
-  const { data, error } = await supabase.from('cafe_products').insert(product).select().single();
-  if (error) throw error;
+  const [data] = await db('cafe_products').insert(product).returning('*');
   return data as CafeProduct;
 };
 
 export const updateCafeProduct = async (id: string, updates: Partial<CafeProduct>) => {
-  const { data, error } = await supabase.from('cafe_products').update(updates).eq('id', id).select().single();
-  if (error) throw error;
+  const [data] = await db('cafe_products').where({ id }).update(updates).returning('*');
   return data as CafeProduct;
 };
 
 export const deleteCafeProduct = async (id: string) => {
-  const { error } = await supabase.from('cafe_products').delete().eq('id', id);
-  if (error) throw error;
+  await db('cafe_products').where({ id }).delete();
 };
 
 // Reports
@@ -275,16 +251,12 @@ export const getReportData = async (period: 'daily' | 'weekly' | 'monthly' | 'qu
       break;
   }
   
-  const { data: transactions, error } = await supabase
-    .from('transactions')
-    .select(`
-      *,
-      orders (*)
-    `)
-    .gte('created_at', startDate)
-    .eq('transaction_type', 'payment');
+  const transactions = await db('transactions')
+    .select('*', 'orders.*')
+    .leftJoin('orders', 'transactions.order_id', 'orders.id')
+    .where('transactions.created_at', '>=', startDate)
+    .where('transaction_type', 'payment');
     
-  if (error) throw error;
   return transactions;
 };
 
@@ -334,25 +306,20 @@ export const processCafeCart = async (
 
 // User Profile Operations
 export const getUserProfile = async (userId: string) => {
-  const { data, error } = await supabase
-    .from('profiles')
+  const data = await db('profiles')
     .select('*')
-    .eq('id', userId)
-    .single();
+    .where({ id: userId })
+    .first();
   
-  if (error) throw error;
   return data;
 };
 
 export const updateUserProfile = async (userId: string, updates: { email?: string; role?: string }) => {
-  const { data, error } = await supabase
-    .from('profiles')
+  const [data] = await db('profiles')
+    .where({ id: userId })
     .update(updates)
-    .eq('id', userId)
-    .select()
-    .single();
+    .returning('*');
   
-  if (error) throw error;
   return data;
 };
 
@@ -362,19 +329,16 @@ export const checkAppointmentConflicts = async (roomId: string, date: string, ti
   const appointmentEnd = new Date(appointmentStart.getTime() + (duration * 60 * 60 * 1000));
   
   // Check for appointment conflicts
-  let query = supabase
-    .from('appointments')
+  let query = db('appointments')
     .select('*')
-    .eq('room_id', roomId)
-    .eq('appointment_date', date)
-    .neq('status', 'cancelled');
+    .where({ room_id: roomId, appointment_date: date })
+    .whereNot({ status: 'cancelled' });
     
   if (excludeId) {
-    query = query.neq('id', excludeId);
+    query = query.whereNot({ id: excludeId });
   }
   
-  const { data: appointments, error } = await query;
-  if (error) throw error;
+  const appointments = await query;
   
   for (const appointment of appointments || []) {
     const existingStart = new Date(`${appointment.appointment_date}T${appointment.appointment_time}`);
@@ -401,3 +365,5 @@ export const updateOrderEnhanced = async (params: { id: string; updates: Partial
   const updatedOrder = await updateOrder(id, updates);
   return { payload: updatedOrder };
 };
+
+

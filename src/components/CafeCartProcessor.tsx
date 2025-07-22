@@ -6,7 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { ShoppingCartIcon, PlusIcon, MinusIcon, TrashIcon } from 'lucide-react';
-import { createOrder, createOrderItem, createTransaction } from '@/services/supabaseService';
+import { createOrder, createOrderItem, createTransaction } from "@/services/dbService";
 import { useToast } from '@/hooks/use-toast';
 
 interface CartItem {
