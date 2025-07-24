@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -9,7 +8,6 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { UserPlusIcon, EditIcon, TrashIcon } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
 interface Profile {
@@ -18,6 +16,18 @@ interface Profile {
   role: string;
   created_at: string;
 }
+
+// Mock local storage-based user management for demo purposes
+const localUserStorage = {
+  getUsers: (): Profile[] => {
+    const users = localStorage.getItem('app_users');
+    return users ? JSON.parse(users) : [];
+  },
+  saveUsers: (users: Profile[]) => {
+    localStorage.setItem('app_users', JSON.stringify(users));
+  },
+  generateId: () => Math.random().toString(36).substr(2, 9)
+};
 
 const UserManagement = () => {
   const [users, setUsers] = useState<Profile[]>([]);
@@ -36,13 +46,8 @@ const UserManagement = () => {
 
   const fetchUsers = async () => {
     try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-      setUsers(data || []);
+      const userData = localUserStorage.getUsers();
+      setUsers(userData);
     } catch (error: any) {
       toast({
         title: "Error",
@@ -59,59 +64,41 @@ const UserManagement = () => {
     setCreateLoading(true);
     
     try {
-      // First create the user in Supabase Auth using signUp
-      const { data, error } = await supabase.auth.signUp({
+      const existingUsers = localUserStorage.getUsers();
+      
+      // Check if user already exists
+      if (existingUsers.some(user => user.email === newUser.email)) {
+        toast({
+          title: "Error",
+          description: "A user with this email already exists.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      const newUserData: Profile = {
+        id: localUserStorage.generateId(),
         email: newUser.email,
-        password: newUser.password,
-        options: {
-          emailRedirectTo: undefined, // Disable email confirmation for admin-created users
-        }
+        role: newUser.role,
+        created_at: new Date().toISOString()
+      };
+
+      const updatedUsers = [...existingUsers, newUserData];
+      localUserStorage.saveUsers(updatedUsers);
+
+      toast({
+        title: "Success",
+        description: "User created successfully!",
       });
 
-      if (error) {
-        // If it's a duplicate user error, try a different approach
-        if (error.message.includes('already registered')) {
-          toast({
-            title: "Error",
-            description: "A user with this email already exists.",
-            variant: "destructive",
-          });
-          return;
-        }
-        throw error;
-      }
-
-      if (data.user) {
-        // Update or insert the profile with the correct role
-        const { error: profileError } = await supabase
-          .from('profiles')
-          .upsert({ 
-            id: data.user.id,
-            email: newUser.email,
-            role: newUser.role 
-          }, {
-            onConflict: 'id'
-          });
-
-        if (profileError) {
-          console.error('Profile creation error:', profileError);
-          // Don't throw here, as the user was created successfully
-        }
-
-        toast({
-          title: "Success",
-          description: `User created successfully! ${data.user.email_confirmed_at ? '' : 'Email confirmation may be required.'}`,
-        });
-
-        setNewUser({ email: '', password: '', role: 'cashier' });
-        setIsAddUserOpen(false);
-        fetchUsers();
-      }
+      setNewUser({ email: '', password: '', role: 'cashier' });
+      setIsAddUserOpen(false);
+      fetchUsers();
     } catch (error: any) {
       console.error('User creation error:', error);
       toast({
         title: "Error",
-        description: error.message || "Failed to create user. Make sure you have admin privileges.",
+        description: error.message || "Failed to create user.",
         variant: "destructive",
       });
     } finally {
@@ -126,19 +113,14 @@ const UserManagement = () => {
     setUpdateLoading(true);
 
     try {
-      // Update profile in our database
-      const { error: profileError } = await supabase
-        .from('profiles')
-        .update({ 
-          email: editForm.email,
-          role: editForm.role 
-        })
-        .eq('id', editingUser.id);
+      const existingUsers = localUserStorage.getUsers();
+      const updatedUsers = existingUsers.map(user => 
+        user.id === editingUser.id 
+          ? { ...user, email: editForm.email, role: editForm.role }
+          : user
+      );
 
-      if (profileError) throw profileError;
-
-      // Note: We can't easily update auth user email/password without admin API
-      // This would require server-side implementation
+      localUserStorage.saveUsers(updatedUsers);
       
       toast({
         title: "Success",
@@ -163,13 +145,9 @@ const UserManagement = () => {
     if (!confirm(`Are you sure you want to delete user: ${userEmail}?`)) return;
 
     try {
-      // Delete from profiles table (the auth user will remain but won't have access)
-      const { error } = await supabase
-        .from('profiles')
-        .delete()
-        .eq('id', userId);
-
-      if (error) throw error;
+      const existingUsers = localUserStorage.getUsers();
+      const updatedUsers = existingUsers.filter(user => user.id !== userId);
+      localUserStorage.saveUsers(updatedUsers);
 
       toast({
         title: "Success",
@@ -336,9 +314,7 @@ const UserManagement = () => {
                   onChange={(e) => setEditForm({...editForm, email: e.target.value})}
                   className="bg-slate-700 border-slate-600 text-white"
                   required
-                  disabled // Email updates require server-side implementation
                 />
-                <p className="text-xs text-gray-400 mt-1">Email updates require server-side implementation</p>
               </div>
               <div>
                 <Label htmlFor="edit-role" className="text-white">Role</Label>

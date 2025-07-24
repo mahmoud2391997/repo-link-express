@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -8,7 +7,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { UserIcon, EditIcon, PlusIcon, TrashIcon, MailIcon } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
 interface UserProfile {
@@ -17,6 +15,18 @@ interface UserProfile {
   role: string;
   created_at: string;
 }
+
+// Mock local storage-based user management for demo purposes
+const localUserStorage = {
+  getUsers: (): UserProfile[] => {
+    const users = localStorage.getItem('app_users');
+    return users ? JSON.parse(users) : [];
+  },
+  saveUsers: (users: UserProfile[]) => {
+    localStorage.setItem('app_users', JSON.stringify(users));
+  },
+  generateId: () => Math.random().toString(36).substr(2, 9)
+};
 
 const UserEmailManagement = () => {
   const [users, setUsers] = useState<UserProfile[]>([]);
@@ -41,13 +51,8 @@ const UserEmailManagement = () => {
 
   const fetchUsers = async () => {
     try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-      setUsers(data || []);
+      const userData = localUserStorage.getUsers();
+      setUsers(userData);
     } catch (error: any) {
       toast({
         title: "Error",
@@ -72,22 +77,28 @@ const UserEmailManagement = () => {
     }
 
     try {
-      const { data, error } = await supabase.auth.signUp({
-        email: newUser.email,
-        password: newUser.password,
-      });
-
-      if (error) throw error;
-
-      if (data.user) {
-        // Update the user's role in the profiles table
-        const { error: profileError } = await supabase
-          .from('profiles')
-          .update({ role: newUser.role })
-          .eq('id', data.user.id);
-
-        if (profileError) throw profileError;
+      const existingUsers = localUserStorage.getUsers();
+      
+      // Check if user already exists
+      if (existingUsers.some(user => user.email === newUser.email)) {
+        toast({
+          title: "Error",
+          description: "User with this email already exists",
+          variant: "destructive",
+          duration: 3000,
+        });
+        return;
       }
+
+      const newUserData: UserProfile = {
+        id: localUserStorage.generateId(),
+        email: newUser.email,
+        role: newUser.role,
+        created_at: new Date().toISOString()
+      };
+
+      const updatedUsers = [...existingUsers, newUserData];
+      localUserStorage.saveUsers(updatedUsers);
 
       await fetchUsers();
       setCreateDialog(false);
@@ -114,27 +125,14 @@ const UserEmailManagement = () => {
     }
 
     try {
-      // Update profile
-      const { error: profileError } = await supabase
-        .from('profiles')
-        .update({ 
-          email: editForm.email,
-          role: editForm.role 
-        })
-        .eq('id', selectedUser.id);
+      const existingUsers = localUserStorage.getUsers();
+      const updatedUsers = existingUsers.map(user => 
+        user.id === selectedUser.id 
+          ? { ...user, email: editForm.email, role: editForm.role }
+          : user
+      );
 
-      if (profileError) throw profileError;
-
-      // Update auth user email if changed
-      if (editForm.email !== selectedUser.email) {
-        const { error: authError } = await supabase.auth.updateUser({
-          email: editForm.email
-        });
-
-        if (authError) {
-          console.warn('Could not update auth email:', authError.message);
-        }
-      }
+      localUserStorage.saveUsers(updatedUsers);
 
       await fetchUsers();
       setEditDialog(false);
@@ -161,12 +159,9 @@ const UserEmailManagement = () => {
     }
 
     try {
-      const { error } = await supabase
-        .from('profiles')
-        .delete()
-        .eq('id', userId);
-
-      if (error) throw error;
+      const existingUsers = localUserStorage.getUsers();
+      const updatedUsers = existingUsers.filter(user => user.id !== userId);
+      localUserStorage.saveUsers(updatedUsers);
 
       await fetchUsers();
 
