@@ -27,7 +27,8 @@ const Index = () => {
                 setUserRole('admin');
                 setShowRoleSelector(false);
               }}
-              className="w-full bg-red-600 hover:bg-red-700 h-12"
+              variant="destructive"
+              className="w-full h-12"
             >
               <SettingsIcon className="w-5 h-5 mr-2" />
               Administrator Access
@@ -38,7 +39,7 @@ const Index = () => {
                 setUserRole('cashier');
                 setShowRoleSelector(false);
               }}
-              className="w-full bg-blue-600 hover:bg-blue-700 h-12"
+              className="w-full h-12"
             >
               <UsersIcon className="w-5 h-5 mr-2" />
               Cashier Access
