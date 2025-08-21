@@ -1,11 +1,14 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { GamepadIcon, ShoppingCartIcon, CalendarIcon, DollarSignIcon, SettingsIcon } from 'lucide-react';
+import { GamepadIcon, ShoppingCartIcon, CalendarIcon, DollarSignIcon, SettingsIcon, DatabaseIcon, CogIcon } from 'lucide-react';
 import RoomsManagement from '@/components/RoomsManagement';
 import CafeManagement from '@/components/CafeManagement';
 import RoomSchedule from '@/components/RoomSchedule';
 import UserManagement from '@/components/UserManagement';
+import BackupRestore from '@/components/BackupRestore';
+import Reports from '@/components/Reports';
+import SystemSettings from '@/components/SystemSettings';
 
 const AdminDashboard = () => {
   return (
@@ -57,7 +60,7 @@ const AdminDashboard = () => {
       </div>
 
       <Tabs defaultValue="rooms" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-5 bg-slate-800 border-0">
+        <TabsList className="grid w-full grid-cols-8 bg-slate-800 border-0">
           <TabsTrigger value="rooms" className="data-[state=active]:bg-blue-600 text-white">
             <GamepadIcon className="w-4 h-4 mr-2" />
             Rooms
@@ -73,6 +76,18 @@ const AdminDashboard = () => {
           <TabsTrigger value="users" className="data-[state=active]:bg-green-600 text-white">
             <SettingsIcon className="w-4 h-4 mr-2" />
             Users
+          </TabsTrigger>
+          <TabsTrigger value="reports" className="data-[state=active]:bg-indigo-600 text-white">
+            <DollarSignIcon className="w-4 h-4 mr-2" />
+            Reports
+          </TabsTrigger>
+          <TabsTrigger value="backup" className="data-[state=active]:bg-purple-600 text-white">
+            <DatabaseIcon className="w-4 h-4 mr-2" />
+            Backup
+          </TabsTrigger>
+          <TabsTrigger value="settings" className="data-[state=active]:bg-gray-600 text-white">
+            <CogIcon className="w-4 h-4 mr-2" />
+            Settings
           </TabsTrigger>
         </TabsList>
 
@@ -90,6 +105,18 @@ const AdminDashboard = () => {
 
         <TabsContent value="users">
           <UserManagement />
+        </TabsContent>
+
+        <TabsContent value="reports">
+          <Reports />
+        </TabsContent>
+
+        <TabsContent value="backup">
+          <BackupRestore />
+        </TabsContent>
+
+        <TabsContent value="settings">
+          <SystemSettings />
         </TabsContent>
       </Tabs>
     </div>

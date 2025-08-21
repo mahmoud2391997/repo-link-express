@@ -7,10 +7,16 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { ReduxProvider } from './store/provider';
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
+import { setupGlobalErrorHandlers } from './utils/errorHandler';
+import { useEffect } from 'react';
 
 const queryClient = new QueryClient();
 
 const App = () => {
+  useEffect(() => {
+    setupGlobalErrorHandlers();
+  }, []);
+
   return (
     <QueryClientProvider client={queryClient}>
       <ReduxProvider>

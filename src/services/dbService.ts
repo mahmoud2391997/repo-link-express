@@ -1,5 +1,16 @@
-const localDbService = await import('./localDbService.js');
-const { db } = localDbService;
+import { v4 as uuidv4 } from 'uuid';
+
+// Dynamic import for Electron environment
+let db: any;
+
+const initDb = async () => {
+  if (!db) {
+    const localDbService = await import('./localDbService.js');
+    db = localDbService.db;
+  }
+  return db;
+};
+
 export interface Room {
   id: string;
   name: string;
@@ -78,32 +89,40 @@ export interface CafeProduct {
 
 // Rooms CRUD Operations
 export const getRooms = async (): Promise<Room[]> => {
-  const data = await db('rooms').select('*').orderBy('name');
+  const database = await initDb();
+  const data = await database('rooms').select('*').orderBy('name');
   return data as Room[];
 };
 
 export const createRoom = async (room: Omit<Room, 'created_at' | 'updated_at'>) => {
-  const [data] = await db('rooms').insert(room).returning('*');
+  const database = await initDb();
+  const roomWithId = { ...room, id: room.id || uuidv4() };
+  const [data] = await database('rooms').insert(roomWithId).returning('*');
   return data as Room;
 };
 
 export const updateRoom = async (id: string, updates: Partial<Room>) => {
-  const [data] = await db('rooms').where({ id }).update(updates).returning('*');
+  const database = await initDb();
+  const [data] = await database('rooms').where({ id }).update(updates).returning('*');
   return data as Room;
 };
 
 export const deleteRoom = async (id: string) => {
-  await db('rooms').where({ id }).delete();
+  const database = await initDb();
+  await database('rooms').where({ id }).delete();
 };
 
 // Appointments CRUD Operations
 export const createAppointment = async (appointment: Omit<Appointment, 'id' | 'created_at' | 'updated_at'>) => {
-  const [data] = await db('appointments').insert(appointment).returning('*');
+  const database = await initDb();
+  const appointmentWithId = { ...appointment, id: uuidv4() };
+  const [data] = await database('appointments').insert(appointmentWithId).returning('*');
   return data as Appointment;
 };
 
 export const getAppointments = async () => {
-  const data = await db('appointments')
+  const database = await initDb();
+  const data = await database('appointments')
     .select('appointments.*', 'rooms.name as room_name', 'rooms.console_type as room_console_type')
     .leftJoin('rooms', 'appointments.room_id', 'rooms.id')
     .orderBy('appointment_date', 'asc');
@@ -111,74 +130,97 @@ export const getAppointments = async () => {
 };
 
 export const updateAppointment = async (id: string, updates: Partial<Appointment>) => {
-  const [data] = await db('appointments').where({ id }).update(updates).returning('*');
+  const database = await initDb();
+  const [data] = await database('appointments').where({ id }).update(updates).returning('*');
   return data as Appointment;
 };
 
 export const deleteAppointment = async (id: string) => {
-  await db('appointments').where({ id }).delete();
+  const database = await initDb();
+  await database('appointments').where({ id }).delete();
 };
 
 // Orders CRUD Operations
 export const createOrder = async (order: Omit<Order, 'id' | 'created_at' | 'updated_at'>) => {
-  const [data] = await db('orders').insert(order).returning('*');
+  const database = await initDb();
+  const orderWithId = { ...order, id: uuidv4() };
+  const [data] = await database('orders').insert(orderWithId).returning('*');
   return data as Order;
 };
 
 export const getOrders = async (status?: string) => {
-  let query = db('orders')
-    .select('orders.*', 'order_items.*', 'transactions.*', 'rooms.name as room_name', 'rooms.console_type as room_console_type')
-    .leftJoin('order_items', 'orders.id', 'order_items.order_id')
-    .leftJoin('transactions', 'orders.id', 'transactions.order_id')
-    .leftJoin('rooms', 'orders.room_id', 'rooms.id')
+  const database = await initDb();
+  // Get orders with related data
+  let ordersQuery = database('orders')
+    .select('*')
     .orderBy('orders.created_at', 'desc');
   
   if (status) {
-    query = query.where('orders.status', status);
+    ordersQuery = ordersQuery.where('status', status);
   }
   
-  const data = await query;
-  return data;
+  const orders = await ordersQuery;
+  
+  // Get order items and rooms for each order
+  for (const order of orders) {
+    const orderItems = await database('order_items').where({ order_id: order.id });
+    const room = order.room_id ? await database('rooms').where({ id: order.room_id }).first() : null;
+    
+    order.order_items = orderItems;
+    order.rooms = room;
+  }
+  
+  return orders;
 };
 
 export const updateOrder = async (id: string, updates: Partial<Order>) => {
-  const [data] = await db('orders').where({ id }).update(updates).returning('*');
+  const database = await initDb();
+  const [data] = await database('orders').where({ id }).update(updates).returning('*');
   return data as Order;
 };
 
 export const deleteOrder = async (id: string) => {
-  await db('orders').where({ id }).delete();
+  const database = await initDb();
+  await database('orders').where({ id }).delete();
 };
 
 // Order Items CRUD Operations
 export const createOrderItem = async (item: Omit<OrderItem, 'id' | 'created_at'>) => {
-  const [data] = await db('order_items').insert(item).returning('*');
+  const database = await initDb();
+  const itemWithId = { ...item, id: uuidv4() };
+  const [data] = await database('order_items').insert(itemWithId).returning('*');
   return data as OrderItem;
 };
 
 export const getOrderItems = async (orderId: string) => {
-  const data = await db('order_items').select('*').where({ order_id: orderId });
+  const database = await initDb();
+  const data = await database('order_items').select('*').where({ order_id: orderId });
   return data as OrderItem[];
 };
 
 export const updateOrderItem = async (id: string, updates: Partial<OrderItem>) => {
-  const [data] = await db('order_items').where({ id }).update(updates).returning('*');
+  const database = await initDb();
+  const [data] = await database('order_items').where({ id }).update(updates).returning('*');
   return data as OrderItem;
 };
 
 export const deleteOrderItem = async (id: string) => {
-  await db('order_items').where({ id }).delete();
+  const database = await initDb();
+  await database('order_items').where({ id }).delete();
 };
 
 // Transactions CRUD Operations
 export const createTransaction = async (transaction: Omit<Transaction, 'id' | 'created_at'>) => {
-  const [data] = await db('transactions').insert(transaction).returning('*');
+  const database = await initDb();
+  const transactionWithId = { ...transaction, id: uuidv4() };
+  const [data] = await database('transactions').insert(transactionWithId).returning('*');
   return data as Transaction;
 };
 
 export const getTransactions = async (startDate?: string, endDate?: string) => {
-  let query = db('transactions')
-    .select('transactions.*', 'orders.*')
+  const database = await initDb();
+  let query = database('transactions')
+    .select('transactions.*')
     .leftJoin('orders', 'transactions.order_id', 'orders.id')
     .orderBy('transactions.created_at', 'desc');
   
@@ -189,41 +231,56 @@ export const getTransactions = async (startDate?: string, endDate?: string) => {
     query = query.where('transactions.created_at', '<=', endDate);
   }
   
-  const data = await query;
-  return data;
+  const transactions = await query;
+  
+  // Get order details for each transaction
+  for (const transaction of transactions) {
+    const order = await database('orders').where({ id: transaction.order_id }).first();
+    transaction.orders = order;
+  }
+  
+  return transactions;
 };
 
 export const updateTransaction = async (id: string, updates: Partial<Transaction>) => {
-  const [data] = await db('transactions').where({ id }).update(updates).returning('*');
+  const database = await initDb();
+  const [data] = await database('transactions').where({ id }).update(updates).returning('*');
   return data as Transaction;
 };
 
 export const deleteTransaction = async (id: string) => {
-  await db('transactions').where({ id }).delete();
+  const database = await initDb();
+  await database('transactions').where({ id }).delete();
 };
 
 // Cafe Products CRUD Operations
 export const getCafeProducts = async (): Promise<CafeProduct[]> => {
-  const data = await db('cafe_products').select('*').orderBy('category');
+  const database = await initDb();
+  const data = await database('cafe_products').select('*').orderBy('category');
   return data as CafeProduct[];
 };
 
 export const createCafeProduct = async (product: Omit<CafeProduct, 'id' | 'created_at' | 'updated_at'>) => {
-  const [data] = await db('cafe_products').insert(product).returning('*');
+  const database = await initDb();
+  const productWithId = { ...product, id: uuidv4() };
+  const [data] = await database('cafe_products').insert(productWithId).returning('*');
   return data as CafeProduct;
 };
 
 export const updateCafeProduct = async (id: string, updates: Partial<CafeProduct>) => {
-  const [data] = await db('cafe_products').where({ id }).update(updates).returning('*');
+  const database = await initDb();
+  const [data] = await database('cafe_products').where({ id }).update(updates).returning('*');
   return data as CafeProduct;
 };
 
 export const deleteCafeProduct = async (id: string) => {
-  await db('cafe_products').where({ id }).delete();
+  const database = await initDb();
+  await database('cafe_products').where({ id }).delete();
 };
 
 // Reports
 export const getReportData = async (period: 'daily' | 'weekly' | 'monthly' | 'quarterly' | 'half-yearly' | 'yearly') => {
+  const database = await initDb();
   const now = new Date();
   let startDate: string;
   
@@ -251,11 +308,17 @@ export const getReportData = async (period: 'daily' | 'weekly' | 'monthly' | 'qu
       break;
   }
   
-  const transactions = await db('transactions')
-    .select('*', 'orders.*')
+  const transactions = await database('transactions')
+    .select('transactions.*')
     .leftJoin('orders', 'transactions.order_id', 'orders.id')
     .where('transactions.created_at', '>=', startDate)
     .where('transaction_type', 'payment');
+    
+  // Get order details for each transaction
+  for (const transaction of transactions) {
+    const order = await database('orders').where({ id: transaction.order_id }).first();
+    transaction.orders = order;
+  }
     
   return transactions;
 };
@@ -325,11 +388,12 @@ export const updateUserProfile = async (userId: string, updates: { email?: strin
 
 // Check appointment conflicts
 export const checkAppointmentConflicts = async (roomId: string, date: string, time: string, duration: number, excludeId?: string) => {
+  const database = await initDb();
   const appointmentStart = new Date(`${date}T${time}`);
   const appointmentEnd = new Date(appointmentStart.getTime() + (duration * 60 * 60 * 1000));
   
   // Check for appointment conflicts
-  let query = db('appointments')
+  let query = database('appointments')
     .select('*')
     .where({ room_id: roomId, appointment_date: date })
     .whereNot({ status: 'cancelled' });

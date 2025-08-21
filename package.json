@@ -7,46 +7,14 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "electron": "wait-on tcp:8080 && electron .",
-    "electron:dev": "concurrently -k \"vite\" \"wait-on tcp:8080 && electron .\"",
+    "electron": "electron .",
+    "electron:dev": "concurrently -k \"vite\" \"wait-on tcp:8080 && NODE_ENV=development electron .\"",
+    "electron:build": "npm run build && electron-builder",
+    "electron:dist": "npm run build && electron-builder --publish=never",
     "postinstall": "npm rebuild better-sqlite3",
-    "package": "electron-builder",
+    "package": "npm run build && electron-builder --config electron-builder.config.js",
+    "dist": "npm run build && electron-builder --config electron-builder.config.js --publish=never",
     "lint": "eslint . --ext ts,tsx --fix"
-  },
-  "build": {
-    "appId": "com.example.myapp",
-    "productName": "My Electron App",
-    "files": [
-      "dist/**/*",
-      "electron-main.cjs",
-      "preload.cjs",
-      "!node_modules/{.cache,.vite,esbuild,typescript}"
-    ],
-    "directories": {
-      "output": "release"
-    },
-    "win": {
-      "target": "nsis",
-      "icon": "public/icon.ico"
-    },
-    "mac": {
-      "target": "dmg",
-      "icon": "public/icon.icns"
-    },
-    "linux": {
-      "target": "AppImage",
-      "icon": "public/icon.png"
-    },
-    "extraResources": [
-      {
-        "from": "node_modules/better-sqlite3/build/Release/better_sqlite3.node",
-        "to": "app.asar.unpacked/node_modules/better-sqlite3/build/Release"
-      }
-    ],
-    "nsis": {
-      "oneClick": false,
-      "allowToChangeInstallationDirectory": true
-    }
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.0",
@@ -101,6 +69,7 @@
     "sonner": "^1.5.0",
     "tailwind-merge": "^2.5.2",
     "tailwindcss-animate": "^1.0.7",
+    "uuid": "^11.1.0",
     "vaul": "^0.9.3",
     "zod": "^3.23.8"
   },
@@ -110,6 +79,7 @@
     "@types/node": "^22.5.5",
     "@types/react": "^18.3.3",
     "@types/react-dom": "^18.3.0",
+    "@types/uuid": "^10.0.0",
     "@vitejs/plugin-react-swc": "^3.5.0",
     "autoprefixer": "^10.4.20",
     "concurrently": "^8.2.2",
