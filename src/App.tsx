@@ -11,6 +11,8 @@ import { setupGlobalErrorHandlers } from './utils/errorHandler';
 
 const queryClient = new QueryClient();
 
+// Production-ready configuration
+
 const App = () => {
   useEffect(() => {
     setupGlobalErrorHandlers();
